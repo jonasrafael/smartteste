@@ -54,14 +54,10 @@ function ensureSuccess(response) {
         throw new Error("Too many requests. Please wait before trying again.");
       case "SERVICE_UNAVAILABLE":
         console.log(`[ENSURE SUCCESS] SERVICE_UNAVAILABLE error detected`);
-        throw new Error(
-          "Tuya service is currently unavailable. Please try again later."
-        );
+        throw new Error("Tuya service is currently unavailable. Please try again later.");
       case "NETWORK_ERROR":
         console.log(`[ENSURE SUCCESS] NETWORK_ERROR error detected`);
-        throw new Error(
-          "Network connection issue. Please check your internet connection."
-        );
+        throw new Error("Network connection issue. Please check your internet connection.");
       default:
         console.log(`[ENSURE SUCCESS] Unknown error code:`, data.header.code);
         if (data.header.msg) {
@@ -98,16 +94,14 @@ async function retryWithBackoff(operation, maxRetries = 3, baseDelay = 1000) {
     } catch (error) {
       const isLastAttempt = attempt === maxRetries;
       const isRetryableError = isRetryableErrorType(error);
-
+      
       if (isLastAttempt || !isRetryableError) {
         throw error;
       }
-
+      
       const delay = baseDelay * Math.pow(2, attempt);
-      console.log(
-        `[RETRY] Attempt ${attempt + 1} failed, retrying in ${delay}ms...`
-      );
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      console.log(`[RETRY] Attempt ${attempt + 1} failed, retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
 }
@@ -115,45 +109,39 @@ async function retryWithBackoff(operation, maxRetries = 3, baseDelay = 1000) {
 // Determine if an error is retryable
 function isRetryableErrorType(error) {
   const retryableMessages = [
-    "temporarily unavailable",
-    "service temporarily unavailable",
-    "service is currently unavailable",
-    "network connection issue",
-    "timeout",
-    "connection refused",
+    'temporarily unavailable',
+    'service temporarily unavailable',
+    'service is currently unavailable',
+    'network connection issue',
+    'timeout',
+    'connection refused'
   ];
-
-  return retryableMessages.some((message) =>
+  
+  return retryableMessages.some(message => 
     error.message.toLowerCase().includes(message.toLowerCase())
   );
 }
 
 // Enhanced error message formatting
-function formatErrorMessage(error, context = "") {
+function formatErrorMessage(error, context = '') {
   let message = error.message;
-
+  
   // Add context if available
   if (context) {
     message = `${context}: ${message}`;
   }
-
+  
   // Add helpful suggestions based on error type
-  if (
-    message.includes("temporarily unavailable") ||
-    message.includes("service is currently unavailable")
-  ) {
-    message +=
-      "\n\n💡 Dica: Este é um problema temporário da Tuya. Tente novamente em alguns minutos.";
-  } else if (message.includes("network connection issue")) {
-    message +=
-      "\n\n💡 Dica: Verifique sua conexão com a internet e tente novamente.";
-  } else if (message.includes("authentication expired")) {
-    message += "\n\n💡 Dica: Sua sessão expirou. Faça login novamente.";
-  } else if (message.includes("too many requests")) {
-    message +=
-      "\n\n💡 Dica: Muitas requisições. Aguarde um pouco antes de tentar novamente.";
+  if (message.includes('temporarily unavailable') || message.includes('service is currently unavailable')) {
+    message += '\n\n💡 Dica: Este é um problema temporário da Tuya. Tente novamente em alguns minutos.';
+  } else if (message.includes('network connection issue')) {
+    message += '\n\n💡 Dica: Verifique sua conexão com a internet e tente novamente.';
+  } else if (message.includes('authentication expired')) {
+    message += '\n\n💡 Dica: Sua sessão expirou. Faça login novamente.';
+  } else if (message.includes('too many requests')) {
+    message += '\n\n💡 Dica: Muitas requisições. Aguarde um pouco antes de tentar novamente.';
   }
-
+  
   return message;
 }
 
@@ -219,16 +207,11 @@ function HomeAssistantClient(session) {
   };
 
   // Enhanced device discovery with additional properties
-  this.deviceDiscovery = async () => {
-    console.log(`[DEVICE DISCOVERY] Starting enhanced discovery process...`);
-    
-    if (!session?.token?.access_token) {
-      throw new Error("No active session. Please log in first.");
-    }
+  this.deviceDiscovery = async (retryCount = 0) => {
+    const maxRetries = 3;
+    const retryDelay = 2000; // 2 seconds
 
-    const operation = async () => {
-      console.log(`[DEVICE DISCOVERY] Making request to /skill endpoint...`);
-
+    try {
       const discoveryResponse = await client.post("/skill", {
         header: {
           payloadVersion: 1,
@@ -239,55 +222,21 @@ function HomeAssistantClient(session) {
           accessToken: session.token.access_token,
         },
       });
-
-      console.log(
-        `[DEVICE DISCOVERY] Raw response received:`,
-        discoveryResponse.data
-      );
-      console.log(
-        `[DEVICE DISCOVERY] Response status:`,
-        discoveryResponse.status
-      );
-
+      console.debug("device discovery response", discoveryResponse.data);
       ensureSuccess(discoveryResponse);
-      console.log(`[DEVICE DISCOVERY] ensureSuccess passed successfully`);
 
       const payload = discoveryResponse.data.payload;
-      console.log(`[DEVICE DISCOVERY] Payload extracted:`, payload);
-
       if (payload && payload.devices) {
-        console.log(
-          `[DEVICE DISCOVERY] Found ${payload.devices.length} devices in payload`
-        );
-
         // Enhanced device processing with additional properties
         payload.devices = payload.devices
           .map((device) => {
-            console.log(`[DEVICE DISCOVERY] Processing device:`, device);
-
             // workaround json escaped signes
-            try {
-              device.name = JSON.parse(`"${device.name}"`);
-              console.log(
-                `[DEVICE DISCOVERY] Device name parsed:`,
-                device.name
-              );
-            } catch (e) {
-              console.log(
-                `[DEVICE DISCOVERY] Failed to parse device name:`,
-                device.name,
-                e
-              );
-            }
+            device.name = JSON.parse(`"${device.name}"`);
 
             // workaround automation type
             if (device.dev_type === "scene" && device.name.endsWith("#")) {
               device.dev_type = "automation";
               device.name = device.name.replace(/\s*#$/, "");
-              console.log(
-                `[DEVICE DISCOVERY] Converted scene to automation:`,
-                device.name
-              );
             }
 
             // Enhanced device properties
@@ -310,10 +259,6 @@ function HomeAssistantClient(session) {
               workMode: this.extractWorkMode(device),
             };
 
-            console.log(
-              `[DEVICE DISCOVERY] Processed device:`,
-              enhancedDevice
-            );
             return enhancedDevice;
           })
           .filter((device) => {
@@ -326,42 +271,33 @@ function HomeAssistantClient(session) {
               device.name.toLowerCase().includes("automation") ||
               device.name.toLowerCase().includes("automação");
 
-            const shouldFilter = isAutomation || isScene || isSceneLike;
-            console.log(
-              `[DEVICE DISCOVERY] Device ${device.name} (${device.type}) - Filtered: ${shouldFilter}`
-            );
-
             // Don't show automations, scenes, or scene-like devices in device list
-            return !shouldFilter;
+            return !isAutomation && !isScene && !isSceneLike;
           });
-
-        console.log(
-          `[DEVICE DISCOVERY] Final processed devices:`,
-          payload.devices
-        );
-      } else {
-        console.log(
-          `[DEVICE DISCOVERY] No devices found in payload or payload is empty`
-        );
-        console.log(
-          `[DEVICE DISCOVERY] Payload structure:`,
-          JSON.stringify(payload, null, 2)
-        );
       }
 
-      console.log(
-        `[DEVICE DISCOVERY] Returning final response:`,
-        discoveryResponse.data
-      );
       return discoveryResponse.data;
-    };
-
-    try {
-      return await retryWithBackoff(operation, 3, 2000);
     } catch (error) {
-      const enhancedError = new Error(formatErrorMessage(error, 'Erro na descoberta de dispositivos'));
-      enhancedError.originalError = error;
-      throw enhancedError;
+      // Retry logic for specific errors
+      if (
+        error.message.includes("temporarily unavailable") &&
+        retryCount < maxRetries
+      ) {
+        console.log(
+          `Device discovery failed, retrying in ${
+            retryDelay / 1000
+          }s... (attempt ${retryCount + 1}/${maxRetries})`
+        );
+
+        // Wait before retry
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
+
+        // Recursive retry
+        return this.deviceDiscovery(retryCount + 1);
+      }
+
+      // If max retries reached or other error, throw
+      throw error;
     }
   };
 
