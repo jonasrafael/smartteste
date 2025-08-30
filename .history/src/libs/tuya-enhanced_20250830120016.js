@@ -43,7 +43,9 @@ function ensureSuccess(response) {
         console.log(
           `[ENSURE SUCCESS] DependentServiceUnavailable error detected`
         );
-        throw new Error("DependentServiceUnavailable");
+        throw new Error(
+          "DependentServiceUnavailable"
+        );
       case "TOKEN_EXPIRED":
         console.log(`[ENSURE SUCCESS] TOKEN_EXPIRED error detected`);
         throw new Error("Authentication expired. Please log in again.");
@@ -90,39 +92,13 @@ function ensureSuccess(response) {
 
 // Enhanced retry strategy with exponential backoff
 // Enhanced retry strategy with Tuya-specific timing recommendations
-// Enhanced retry strategy with Tuya-specific timing recommendations and fallback
-async function retryWithBackoff(operation, maxRetries = 2, baseDelay = 5000, fallbackData = null) {
+async function retryWithBackoff(operation, maxRetries = 2, baseDelay = 5000) {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await operation();
     } catch (error) {
       const isLastAttempt = attempt === maxRetries;
       const isRetryableError = isRetryableErrorType(error);
-
-      // Special handling for DependentServiceUnavailable
-      if (error.message.includes('DependentServiceUnavailable')) {
-        console.log(`[RETRY] DependentServiceUnavailable detected on attempt ${attempt + 1}`);
-        
-        if (fallbackData && attempt === 0) {
-          console.log(`[RETRY] Using fallback data for immediate response`);
-          return fallbackData;
-        }
-        
-        if (isLastAttempt) {
-          console.log(`[RETRY] Max retries reached for DependentServiceUnavailable`);
-          if (fallbackData) {
-            console.log(`[RETRY] Returning fallback data as final fallback`);
-            return fallbackData;
-          }
-          throw new Error('Tuya service is currently unavailable. Please try again later. You can use cached data if available.');
-        }
-        
-        // For DependentServiceUnavailable, use much longer delays
-        const delay = baseDelay * Math.pow(5, attempt); // 5s, 25s, 125s
-        console.log(`[RETRY] Service unavailable. Waiting ${delay/1000}s before retry ${attempt + 1}/${maxRetries}...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        continue;
-      }
 
       if (isLastAttempt || !isRetryableError) {
         throw error;
@@ -131,8 +107,8 @@ async function retryWithBackoff(operation, maxRetries = 2, baseDelay = 5000, fal
       // Tuya-specific retry strategy with longer delays
       let delay;
       if (
-        error.message.includes("temporarily unavailable") ||
-        error.message.includes("service is currently unavailable")
+        error.message.includes("DependentServiceUnavailable") ||
+        error.message.includes("temporarily unavailable")
       ) {
         // For service unavailability, use longer delays
         delay = baseDelay * Math.pow(3, attempt); // 5s, 15s, 45s
@@ -193,10 +169,7 @@ function formatErrorMessage(error, context = "") {
   }
 
   // Add helpful suggestions based on error type
-  if (message.includes('DependentServiceUnavailable')) {
-    message +=
-      "\n\n💡 Dica: O serviço da Tuya está temporariamente indisponível. O sistema tentará automaticamente em 5s, 25s e 125s. Se persistir, você pode usar dados em cache.";
-  } else if (
+  if (
     message.includes("temporarily unavailable") ||
     message.includes("service is currently unavailable")
   ) {
@@ -415,18 +388,7 @@ function HomeAssistantClient(session) {
     };
 
     try {
-      // Try to get cached data as fallback
-      const cachedDevices = JSON.parse(localStorage.getItem('devices')) || [];
-      const fallbackData = cachedDevices.length > 0 ? { 
-        payload: { devices: cachedDevices },
-        header: { code: 'CACHED_DATA' }
-      } : null;
-
-      if (fallbackData) {
-        console.log(`[DEVICE DISCOVERY] Found ${cachedDevices.length} cached devices as fallback`);
-      }
-
-      return await retryWithBackoff(operation, 2, 5000, fallbackData);
+      return await retryWithBackoff(operation, 2, 5000);
     } catch (error) {
       const enhancedError = new Error(
         formatErrorMessage(error, "Erro na descoberta de dispositivos")

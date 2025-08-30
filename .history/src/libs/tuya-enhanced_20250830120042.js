@@ -193,10 +193,7 @@ function formatErrorMessage(error, context = "") {
   }
 
   // Add helpful suggestions based on error type
-  if (message.includes('DependentServiceUnavailable')) {
-    message +=
-      "\n\n💡 Dica: O serviço da Tuya está temporariamente indisponível. O sistema tentará automaticamente em 5s, 25s e 125s. Se persistir, você pode usar dados em cache.";
-  } else if (
+  if (
     message.includes("temporarily unavailable") ||
     message.includes("service is currently unavailable")
   ) {
@@ -415,18 +412,7 @@ function HomeAssistantClient(session) {
     };
 
     try {
-      // Try to get cached data as fallback
-      const cachedDevices = JSON.parse(localStorage.getItem('devices')) || [];
-      const fallbackData = cachedDevices.length > 0 ? { 
-        payload: { devices: cachedDevices },
-        header: { code: 'CACHED_DATA' }
-      } : null;
-
-      if (fallbackData) {
-        console.log(`[DEVICE DISCOVERY] Found ${cachedDevices.length} cached devices as fallback`);
-      }
-
-      return await retryWithBackoff(operation, 2, 5000, fallbackData);
+      return await retryWithBackoff(operation, 2, 5000);
     } catch (error) {
       const enhancedError = new Error(
         formatErrorMessage(error, "Erro na descoberta de dispositivos")

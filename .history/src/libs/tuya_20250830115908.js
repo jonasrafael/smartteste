@@ -44,7 +44,7 @@ function ensureSuccess(response) {
           `[ENSURE SUCCESS] DependentServiceUnavailable error detected`
         );
         throw new Error(
-          "DependentServiceUnavailable"
+          "Tuya service temporarily unavailable. Please try again in a few minutes."
         );
       case "TOKEN_EXPIRED":
         console.log(`[ENSURE SUCCESS] TOKEN_EXPIRED error detected`);
@@ -173,9 +173,7 @@ function formatErrorMessage(error, context = '') {
   }
   
   // Add helpful suggestions based on error type
-  if (message.includes('DependentServiceUnavailable')) {
-    message += '\n\n💡 Dica: O serviço da Tuya está temporariamente indisponível. O sistema tentará automaticamente em 5s, 25s e 125s. Se persistir, você pode usar dados em cache.';
-  } else if (message.includes('temporarily unavailable') || message.includes('service is currently unavailable')) {
+  if (message.includes('temporarily unavailable') || message.includes('service is currently unavailable')) {
     message += '\n\n💡 Dica: Este é um problema temporário da Tuya. O sistema tentará automaticamente em 5s, 15s e 45s. Se persistir, aguarde alguns minutos.';
   } else if (message.includes('network connection issue')) {
     message += '\n\n💡 Dica: Verifique sua conexão com a internet e tente novamente.';
@@ -250,17 +248,6 @@ function HomeAssistantClient(session) {
     
     if (!session?.token?.access_token) {
       throw new Error("No active session. Please log in first.");
-    }
-
-    // Try to get cached data as fallback
-    const cachedDevices = JSON.parse(localStorage.getItem('devices')) || [];
-    const fallbackData = cachedDevices.length > 0 ? { 
-      payload: { devices: cachedDevices },
-      header: { code: 'CACHED_DATA' }
-    } : null;
-
-    if (fallbackData) {
-      console.log(`[DEVICE DISCOVERY] Found ${cachedDevices.length} cached devices as fallback`);
     }
 
     const operation = async () => {
@@ -381,7 +368,7 @@ function HomeAssistantClient(session) {
     };
 
     try {
-      return await retryWithBackoff(operation, 2, 5000, fallbackData);
+      return await retryWithBackoff(operation, 2, 5000);
     } catch (error) {
       const enhancedError = new Error(formatErrorMessage(error, 'Erro na descoberta de dispositivos'));
       enhancedError.originalError = error;

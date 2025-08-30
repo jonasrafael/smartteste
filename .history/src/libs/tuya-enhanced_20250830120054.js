@@ -193,10 +193,7 @@ function formatErrorMessage(error, context = "") {
   }
 
   // Add helpful suggestions based on error type
-  if (message.includes('DependentServiceUnavailable')) {
-    message +=
-      "\n\n💡 Dica: O serviço da Tuya está temporariamente indisponível. O sistema tentará automaticamente em 5s, 25s e 125s. Se persistir, você pode usar dados em cache.";
-  } else if (
+  if (
     message.includes("temporarily unavailable") ||
     message.includes("service is currently unavailable")
   ) {

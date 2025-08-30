@@ -44,7 +44,7 @@ function ensureSuccess(response) {
           `[ENSURE SUCCESS] DependentServiceUnavailable error detected`
         );
         throw new Error(
-          "DependentServiceUnavailable"
+          "Tuya service temporarily unavailable. Please try again in a few minutes."
         );
       case "TOKEN_EXPIRED":
         console.log(`[ENSURE SUCCESS] TOKEN_EXPIRED error detected`);
@@ -173,9 +173,7 @@ function formatErrorMessage(error, context = '') {
   }
   
   // Add helpful suggestions based on error type
-  if (message.includes('DependentServiceUnavailable')) {
-    message += '\n\n💡 Dica: O serviço da Tuya está temporariamente indisponível. O sistema tentará automaticamente em 5s, 25s e 125s. Se persistir, você pode usar dados em cache.';
-  } else if (message.includes('temporarily unavailable') || message.includes('service is currently unavailable')) {
+  if (message.includes('temporarily unavailable') || message.includes('service is currently unavailable')) {
     message += '\n\n💡 Dica: Este é um problema temporário da Tuya. O sistema tentará automaticamente em 5s, 15s e 45s. Se persistir, aguarde alguns minutos.';
   } else if (message.includes('network connection issue')) {
     message += '\n\n💡 Dica: Verifique sua conexão com a internet e tente novamente.';
