@@ -155,7 +155,7 @@
               
               <div v-else class="room-empty">
                 <el-empty description="Nenhum dispositivo nesta sala" :image-size="60">
-                  <el-button type="primary" size="small" @click="openDeviceAssignmentDialog(room.id)">
+                  <el-button type="primary" size="small" @click="showDeviceAssignmentDialog(room.id)">
                     Adicionar Dispositivo
                   </el-button>
                 </el-empty>
