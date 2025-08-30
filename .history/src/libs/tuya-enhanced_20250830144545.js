@@ -290,67 +290,32 @@ function HomeAssistantClient(session) {
     session.token = normalizeToken(accessResponse.data);
   };
 
-  this.getSession = () => {
-    try {
-      if (!session) {
-        console.log(`[SESSION] No session found`);
-        return null;
-      }
-      
-      if (!session.token) {
-        console.log(`[SESSION] No token found in session`);
-        session = null;
-        return null;
-      }
-      
-      if (!session.token.access_token) {
-        console.log(`[SESSION] No access token found`);
-        session = null;
-        return null;
-      }
-      
-      // Check if token is expired
-      if (session.token.expires && Date.now() / 1000 > session.token.expires) {
-        console.log(`[SESSION] Token expired, clearing session`);
-        session = null;
-        localStorage.removeItem('session');
-        return null;
-      }
-      
-      console.log(`[SESSION] Valid session found`);
-      return session;
-    } catch (error) {
-      console.error(`[SESSION] Error getting session:`, error);
-      session = null;
-      localStorage.removeItem('session');
-      return null;
-    }
-  };
+  this.getSession = () => session;
 
   this.dropSession = () => {
     session = null;
   };
 
   // Enhanced device discovery with additional properties
-  this.deviceDiscovery = async () => {
+    this.deviceDiscovery = async () => {
     console.log(`[DEVICE DISCOVERY] Starting enhanced discovery process...`);
-
+    
     // Enhanced session validation
     if (!session) {
       console.log(`[DEVICE DISCOVERY] No session found`);
       throw new Error("No active session. Please log in first.");
     }
-
+    
     if (!session.token) {
       console.log(`[DEVICE DISCOVERY] No token found in session`);
       throw new Error("Session token is missing. Please log in again.");
     }
-
+    
     if (!session.token.access_token) {
       console.log(`[DEVICE DISCOVERY] No access token found`);
       throw new Error("Access token is missing. Please log in again.");
     }
-
+    
     // Check if token is expired
     if (session.token.expires && Date.now() / 1000 > session.token.expires) {
       console.log(`[DEVICE DISCOVERY] Token expired, clearing session`);
@@ -360,11 +325,6 @@ function HomeAssistantClient(session) {
 
     const operation = async () => {
       console.log(`[DEVICE DISCOVERY] Making request to /skill endpoint...`);
-
-      // Double-check session before making request
-      if (!session?.token?.access_token) {
-        throw new Error("Session lost during operation. Please log in again.");
-      }
 
       const discoveryResponse = await client.post("/skill", {
         header: {
@@ -509,21 +469,6 @@ function HomeAssistantClient(session) {
 
       return await retryWithBackoff(operation, 2, 5000, fallbackData);
     } catch (error) {
-      // Enhanced error handling
-      if (
-        error.message.includes("Session lost") ||
-        error.message.includes("No active session") ||
-        error.message.includes("Session has expired")
-      ) {
-        // Clear invalid session
-        session = null;
-        localStorage.removeItem("session");
-        console.log(
-          `[DEVICE DISCOVERY] Session cleared due to error:`,
-          error.message
-        );
-      }
-
       const enhancedError = new Error(
         formatErrorMessage(error, "Erro na descoberta de dispositivos")
       );

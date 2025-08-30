@@ -233,40 +233,12 @@ function HomeAssistantClient(session) {
   };
 
   this.getSession = () => {
-    try {
-      if (!session) {
-        console.log(`[SESSION] No session found`);
-        return null;
-      }
-      
-      if (!session.token) {
-        console.log(`[SESSION] No token found in session`);
-        session = null;
-        return null;
-      }
-      
-      if (!session.token.access_token) {
-        console.log(`[SESSION] No access token found`);
-        session = null;
-        return null;
-      }
-      
-      // Check if token is expired
-      if (session.token.expires && Date.now() / 1000 > session.token.expires) {
-        console.log(`[SESSION] Token expired, clearing session`);
-        session = null;
-        localStorage.removeItem('session');
-        return null;
-      }
-      
-      console.log(`[SESSION] Valid session found`);
-      return session;
-    } catch (error) {
-      console.error(`[SESSION] Error getting session:`, error);
+    if (!session?.token) return null;
+    if (Date.now() / 1000 > session.token.expires) {
       session = null;
-      localStorage.removeItem('session');
       return null;
     }
+    return session;
   };
 
   this.logout = () => {
