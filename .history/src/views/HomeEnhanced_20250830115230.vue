@@ -658,15 +658,38 @@ watch(logLevel, async () => {
   await loadLogs()
 })
 
-// Login and logout are now handled in App.vue
+const login = async () => {
+  try {
+    await homeAssistantClient.login(
+      loginForm.value.username,
+      loginForm.value.password
+    )
+    const session = homeAssistantClient.getSession()
+    localStorage.setItem('session', JSON.stringify(session))
+    
+    // Update profile form with session data
+    profileForm.value.username = loginForm.value.username
+    profileForm.value.region = session.region
+    
+    loginState.value = true
+    loginForm.value = { username: '', password: '' }
+    refreshAll()
+  } catch (err) {
+    ElMessage.error(`Oops, login error. (${err})`)
+  }
+}
+
+const logout = () => {
+  homeAssistantClient.dropSession()
+  localStorage.clear()
+  loginState.value = false
+  loginForm.value = { username: '', password: '' }
+  devices.value = []
+  scenes.value = []
+  activeTab.value = 'devices'
+}
 
 const refreshAll = async () => {
-  // Check if user is logged in
-  if (!homeAssistantClient.getSession()) {
-    ElMessage.warning('Por favor, faça login primeiro')
-    return
-  }
-
   try {
     await Promise.all([
       refreshDevices(),
@@ -1764,74 +1787,5 @@ h2 {
   direction: ltr;
   -webkit-font-feature-settings: 'liga';
   -webkit-font-smoothing: antialiased;
-}
-
-/* Action Header Styles */
-.action-header {
-  background: white;
-  border-radius: 12px;
-  padding: 24px;
-  margin-bottom: 24px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 20px;
-}
-
-.header-left {
-  flex: 1;
-  min-width: 300px;
-}
-
-.page-title {
-  margin: 0 0 8px 0;
-  font-size: 28px;
-  font-weight: 600;
-  color: #2c3e50;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.page-title .material-icons-round {
-  font-size: 32px;
-  color: #667eea;
-}
-
-.page-subtitle {
-  margin: 0;
-  font-size: 16px;
-  color: #606266;
-  font-weight: 400;
-}
-
-.header-actions {
-  display: flex;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-/* Responsive Design */
-@media (max-width: 768px) {
-  .action-header {
-    flex-direction: column;
-    text-align: center;
-    padding: 20px;
-  }
-  
-  .header-left {
-    min-width: auto;
-  }
-  
-  .page-title {
-    font-size: 24px;
-    justify-content: center;
-  }
-  
-  .header-actions {
-    justify-content: center;
-  }
 }
 </style>
