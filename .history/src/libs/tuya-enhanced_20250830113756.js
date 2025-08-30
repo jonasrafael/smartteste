@@ -91,8 +91,7 @@ function ensureSuccess(response) {
 }
 
 // Enhanced retry strategy with exponential backoff
-// Enhanced retry strategy with Tuya-specific timing recommendations
-async function retryWithBackoff(operation, maxRetries = 2, baseDelay = 5000) {
+async function retryWithBackoff(operation, maxRetries = 3, baseDelay = 1000) {
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       return await operation();
@@ -104,24 +103,10 @@ async function retryWithBackoff(operation, maxRetries = 2, baseDelay = 5000) {
         throw error;
       }
 
-      // Tuya-specific retry strategy with longer delays
-      let delay;
-      if (error.message.includes('DependentServiceUnavailable') || 
-          error.message.includes('temporarily unavailable')) {
-        // For service unavailability, use longer delays
-        delay = baseDelay * Math.pow(3, attempt); // 5s, 15s, 45s
-        console.log(`[RETRY] Service unavailable detected. Waiting ${delay/1000}s before retry ${attempt + 1}/${maxRetries}...`);
-      } else if (error.message.includes('rate limit') || 
-                 error.message.includes('too many requests')) {
-        // For rate limiting, use even longer delays
-        delay = baseDelay * Math.pow(4, attempt); // 5s, 20s, 80s
-        console.log(`[RETRY] Rate limit detected. Waiting ${delay/1000}s before retry ${attempt + 1}/${maxRetries}...`);
-      } else {
-        // For other retryable errors, use standard exponential backoff
-        delay = baseDelay * Math.pow(2, attempt); // 5s, 10s, 20s
-        console.log(`[RETRY] Attempt ${attempt + 1} failed, retrying in ${delay/1000}s...`);
-      }
-      
+      const delay = baseDelay * Math.pow(2, attempt);
+      console.log(
+        `[RETRY] Attempt ${attempt + 1} failed, retrying in ${delay}ms...`
+      );
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
@@ -158,15 +143,15 @@ function formatErrorMessage(error, context = "") {
     message.includes("service is currently unavailable")
   ) {
     message +=
-      "\n\n💡 Dica: Este é um problema temporário da Tuya. O sistema tentará automaticamente em 5s, 15s e 45s. Se persistir, aguarde alguns minutos.";
+      "\n\n💡 Dica: Este é um problema temporário da Tuya. Tente novamente em alguns minutos.";
   } else if (message.includes("network connection issue")) {
     message +=
       "\n\n💡 Dica: Verifique sua conexão com a internet e tente novamente.";
   } else if (message.includes("authentication expired")) {
     message += "\n\n💡 Dica: Sua sessão expirou. Faça login novamente.";
-  } else if (message.includes("too many requests") || message.includes("rate limit")) {
+  } else if (message.includes("too many requests")) {
     message +=
-      "\n\n💡 Dica: Muitas requisições. O sistema aguardará automaticamente (5s, 20s, 80s) antes de tentar novamente.";
+      "\n\n💡 Dica: Muitas requisições. Aguarde um pouco antes de tentar novamente.";
   }
 
   return message;
@@ -369,7 +354,7 @@ function HomeAssistantClient(session) {
     };
 
     try {
-      return await retryWithBackoff(operation, 2, 5000);
+      return await retryWithBackoff(operation, 3, 2000);
     } catch (error) {
       const enhancedError = new Error(
         formatErrorMessage(error, "Erro na descoberta de dispositivos")

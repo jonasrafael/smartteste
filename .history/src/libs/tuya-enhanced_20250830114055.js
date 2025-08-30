@@ -158,15 +158,15 @@ function formatErrorMessage(error, context = "") {
     message.includes("service is currently unavailable")
   ) {
     message +=
-      "\n\n💡 Dica: Este é um problema temporário da Tuya. O sistema tentará automaticamente em 5s, 15s e 45s. Se persistir, aguarde alguns minutos.";
+      "\n\n💡 Dica: Este é um problema temporário da Tuya. Tente novamente em alguns minutos.";
   } else if (message.includes("network connection issue")) {
     message +=
       "\n\n💡 Dica: Verifique sua conexão com a internet e tente novamente.";
   } else if (message.includes("authentication expired")) {
     message += "\n\n💡 Dica: Sua sessão expirou. Faça login novamente.";
-  } else if (message.includes("too many requests") || message.includes("rate limit")) {
+  } else if (message.includes("too many requests")) {
     message +=
-      "\n\n💡 Dica: Muitas requisições. O sistema aguardará automaticamente (5s, 20s, 80s) antes de tentar novamente.";
+      "\n\n💡 Dica: Muitas requisições. Aguarde um pouco antes de tentar novamente.";
   }
 
   return message;
