@@ -43,7 +43,7 @@
                 <el-button type="default" circle size="large"
                   :class="device.data.state ? 'state-on' : 'state-off'"
                   :disabled="!device.data.online"
-                  @click="toggleDeviceWithRateLimit(device);"
+                  @click="toggleDevice(device);"
                 ><i class="material-icons-round">{{ device.data.online ? 'power_settings_new' : 'cloud_off' }}</i></el-button>
               </div>
 
@@ -191,10 +191,10 @@
                   <span class="scene-name">{{ scene.name }}</span>
                   <span class="scene-type">{{ scene.type === 'automation' ? 'Automação' : 'Cena' }}</span>
                 </div>
-                                  <el-button type="primary" circle size="large"
-                    class="trigger"
-                    @click="triggerSceneWithRateLimit(scene);"
-                  ><i class="material-icons-round">play_arrow</i></el-button>
+                <el-button type="primary" circle size="large"
+                  class="trigger"
+                  @click="triggerScene(scene);"
+                ><i class="material-icons-round">play_arrow</i></el-button>
               </div>
             </el-card>
           </div>
@@ -566,39 +566,6 @@ const tuyaEventCounts = ref({
 // Device control queue status
 const deviceQueueStatus = ref(new Map())
 
-// Backup system state
-const showBackupDialog = ref(false)
-const showRestoreDialog = ref(false)
-const showBackupInfoDialog = ref(false)
-const isCreatingBackup = ref(false)
-const isDownloading = ref(false)
-const isRestoring = ref(false)
-const lastBackup = ref(null)
-const selectedBackupFile = ref(null)
-
-// Backup options
-const backupOptions = ref({
-  includeSensitive: false,
-  compress: true,
-  encrypt: false
-})
-
-// Restore options
-const restoreOptions = ref({
-  mode: 'merge',
-  backupBefore: true
-})
-
-// Backup summary
-const backupSummary = ref({
-  devices: 0,
-  scenes: 0,
-  rooms: 0,
-  records: 0,
-  logs: 0,
-  settings: 0
-})
-
 const devicesSorted = computed(() => {
   const order = { true: 0, undefined: 1, false: 2 }
   return devices.value.slice().sort((d1, d2) =>
@@ -608,47 +575,37 @@ const devicesSorted = computed(() => {
 
 const loginForm = ref({ username: '', password: '' })
 
-  onMounted(async () => {
-    // TODO handle expired session
-    loginState.value = !!homeAssistantClient.getSession()
-    if (!loginState.value) {
-      localStorage.clear()
-    } else {
-      // Load profile data
-      const session = homeAssistantClient.getSession()
-      profileForm.value.username = session?.username || ''
-      profileForm.value.region = session?.region || 'eu'
-      
-      // Load saved profile preferences
-      const savedProfile = JSON.parse(localStorage.getItem('profile')) || {}
-      profileForm.value = { ...profileForm.value, ...savedProfile }
-    }
+onMounted(async () => {
+  // TODO handle expired session
+  loginState.value = !!homeAssistantClient.getSession()
+  if (!loginState.value) {
+    localStorage.clear()
+  } else {
+    // Load profile data
+    const session = homeAssistantClient.getSession()
+    profileForm.value.username = session?.username || ''
+    profileForm.value.region = session?.region || 'eu'
     
-    devices.value = JSON.parse(localStorage.getItem('devices')) || []
-    scenes.value = JSON.parse(localStorage.getItem('scenes')) || []
-    
-    // Load rooms and organize devices
-    await loadRooms()
-    await loadAnalytics()
-    await loadLogs()
-    
-    // Check if monitoring was previously active
-    const wasMonitoring = localStorage.getItem('tuya_monitoring_active') === 'true'
-    if (wasMonitoring) {
-      // Restart monitoring if it was active before
-      startTuyaMonitoring()
-    }
-    
-    // Load last backup info
-    const savedLastBackup = localStorage.getItem('lastBackup')
-    if (savedLastBackup) {
-      try {
-        lastBackup.value = JSON.parse(savedLastBackup)
-      } catch (err) {
-        console.error('Error loading last backup info:', err)
-      }
-    }
-  })
+    // Load saved profile preferences
+    const savedProfile = JSON.parse(localStorage.getItem('profile')) || {}
+    profileForm.value = { ...profileForm.value, ...savedProfile }
+  }
+  
+  devices.value = JSON.parse(localStorage.getItem('devices')) || []
+  scenes.value = JSON.parse(localStorage.getItem('scenes')) || []
+  
+  // Load rooms and organize devices
+  await loadRooms()
+  await loadAnalytics()
+  await loadLogs()
+  
+  // Check if monitoring was previously active
+  const wasMonitoring = localStorage.getItem('tuya_monitoring_active') === 'true'
+  if (wasMonitoring) {
+    // Restart monitoring if it was active before
+    startTuyaMonitoring()
+  }
+})
 
 // Watch for analytics period changes
 watch(analyticsPeriod, async () => {
@@ -941,394 +898,6 @@ const getDeviceName = (deviceId) => {
   const device = devices.value.find(d => d.id === deviceId)
   return device ? device.name : `Dispositivo ${deviceId}`
 }
-
-// Real-time monitoring functions
-const startTuyaMonitoring = async () => {
-  try {
-    const success = await homeAssistantClient.startTuyaEventMonitoring(handleTuyaEvents);
-    if (success) {
-      isMonitoringActive.value = true;
-      localStorage.setItem('tuya_monitoring_active', 'true');
-      ElMessage.success('Monitoramento em tempo real iniciado!');
-      
-      // Start updating queue status
-      startQueueStatusUpdates();
-    } else {
-      ElMessage.error('Falha ao iniciar monitoramento');
-    }
-  } catch (err) {
-    ElMessage.error(`Erro ao iniciar monitoramento: ${err.message}`);
-  }
-};
-
-const stopTuyaMonitoring = () => {
-  try {
-    homeAssistantClient.stopTuyaEventMonitoring();
-    isMonitoringActive.value = false;
-    localStorage.setItem('tuya_monitoring_active', 'false');
-    ElMessage.success('Monitoramento em tempo real parado!');
-    
-    // Stop updating queue status
-    stopQueueStatusUpdates();
-  } catch (err) {
-    ElMessage.error(`Erro ao parar monitoramento: ${err.message}`);
-  }
-};
-
-// Handle Tuya events from monitoring
-const handleTuyaEvents = (events) => {
-  try {
-    // Update event counts
-    Object.keys(events).forEach(eventType => {
-      const eventList = events[eventType];
-      if (eventList && eventList.length > 0) {
-        tuyaEventCounts.value[eventType] = (tuyaEventCounts.value[eventType] || 0) + eventList.length;
-        tuyaEventCounts.value.total = (tuyaEventCounts.value.total || 0) + eventList.length;
-      }
-    });
-
-    // Refresh logs to show new events
-    refreshLogs();
-    
-  } catch (err) {
-    console.error('Error handling Tuya events:', err);
-  }
-};
-
-// Queue status updates
-let queueStatusInterval = null;
-
-const startQueueStatusUpdates = () => {
-  queueStatusInterval = setInterval(() => {
-    updateDeviceQueueStatus();
-  }, 1000); // Update every second
-};
-
-const stopQueueStatusUpdates = () => {
-  if (queueStatusInterval) {
-    clearInterval(queueStatusInterval);
-    queueStatusInterval = null;
-  }
-};
-
-const updateDeviceQueueStatus = () => {
-  try {
-    const newStatus = new Map();
-    
-    devices.value.forEach(device => {
-      const status = homeAssistantClient.getDeviceControlQueueStatus(device.id);
-      newStatus.set(device.id, status);
-    });
-    
-    deviceQueueStatus.value = newStatus;
-  } catch (err) {
-    console.error('Error updating device queue status:', err);
-  }
-};
-
-// Backup and restore functions
-const createBackup = async () => {
-  try {
-    isCreatingBackup.value = true;
-    
-    // Collect all data for backup
-    const backupData = {
-      version: '1.0.0',
-      timestamp: Date.now(),
-      metadata: {
-        app: 'Smart Life WebApp Enhanced',
-        user: profileForm.value.username,
-        region: profileForm.value.region
-      },
-      data: {
-        devices: devices.value,
-        scenes: scenes.value,
-        rooms: rooms.value,
-        deviceRecords: deviceRecords.value,
-        systemLogs: systemLogs.value,
-        profile: profileForm.value,
-        monitoring: {
-          isActive: isMonitoringActive.value,
-          eventCounts: tuyaEventCounts.value
-        }
-      }
-    };
-    
-    // Update backup summary
-    backupSummary.value = {
-      devices: devices.value.length,
-      scenes: scenes.value.length,
-      rooms: rooms.value.length,
-      records: deviceRecords.value.length,
-      logs: systemLogs.value.length,
-      settings: 1
-    };
-    
-    // Show backup dialog
-    showBackupDialog.value = true;
-    
-    ElMessage.success('Backup preparado com sucesso!');
-    
-  } catch (err) {
-    console.error('Error creating backup:', err);
-    ElMessage.error('Erro ao criar backup');
-  } finally {
-    isCreatingBackup.value = false;
-  }
-};
-
-const downloadBackup = async () => {
-  try {
-    isDownloading.value = true;
-    
-    // Create backup data
-    const backupData = {
-      version: '1.0.0',
-      timestamp: Date.now(),
-      metadata: {
-        app: 'Smart Life WebApp Enhanced',
-        user: profileForm.value.username,
-        region: profileForm.value.region
-      },
-      data: {
-        devices: devices.value,
-        scenes: scenes.value,
-        rooms: rooms.value,
-        deviceRecords: deviceRecords.value,
-        systemLogs: systemLogs.value,
-        profile: profileForm.value,
-        monitoring: {
-          isActive: isMonitoringActive.value,
-          eventCounts: tuyaEventCounts.value
-        }
-      }
-    };
-    
-    // Convert to JSON
-    let backupContent = JSON.stringify(backupData, null, 2);
-    let fileName = `smart-life-backup-${new Date().toISOString().split('T')[0]}.json`;
-    
-    // Handle compression if enabled
-    if (backupOptions.value.compress) {
-      // Simple compression - remove unnecessary whitespace
-      backupContent = JSON.stringify(backupData);
-      fileName = fileName.replace('.json', '-compressed.json');
-    }
-    
-    // Handle encryption if enabled
-    if (backupOptions.value.encrypt) {
-      // Simple encryption - base64 encoding (for demo purposes)
-      backupContent = btoa(backupContent);
-      fileName = fileName.replace('.json', '-encrypted.txt');
-    }
-    
-    // Create and download file
-    const blob = new Blob([backupContent], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    // Update last backup info
-    lastBackup.value = {
-      timestamp: Date.now(),
-      size: blob.size,
-      itemCount: Object.keys(backupData.data).length
-    };
-    
-    // Save backup info to localStorage
-    localStorage.setItem('lastBackup', JSON.stringify(lastBackup.value));
-    
-    showBackupDialog.value = false;
-    ElMessage.success('Backup baixado com sucesso!');
-    
-  } catch (err) {
-    console.error('Error downloading backup:', err);
-    ElMessage.error('Erro ao baixar backup');
-  } finally {
-    isDownloading.value = false;
-  }
-};
-
-const handleBackupFileSelect = (file) => {
-  selectedBackupFile.value = file.raw;
-};
-
-const restoreBackup = async () => {
-  if (!selectedBackupFile.value) {
-    ElMessage.warning('Selecione um arquivo de backup primeiro');
-    return;
-  }
-  
-  try {
-    isRestoring.value = true;
-    
-    // Read file content
-    const fileContent = await readFileContent(selectedBackupFile.value);
-    
-    // Parse backup data
-    let backupData;
-    try {
-      backupData = JSON.parse(fileContent);
-    } catch (err) {
-      // Try to decode if encrypted
-      try {
-        const decoded = atob(fileContent);
-        backupData = JSON.parse(decoded);
-      } catch (decodeErr) {
-        throw new Error('Arquivo de backup inválido ou corrompido');
-      }
-    }
-    
-    // Validate backup structure
-    if (!backupData.version || !backupData.data) {
-      throw new Error('Estrutura de backup inválida');
-    }
-    
-    // Create backup before restore if enabled
-    if (restoreOptions.value.backupBefore) {
-      await createBackup();
-    }
-    
-    // Restore data based on mode
-    if (restoreOptions.value.mode === 'replace') {
-      // Replace all data
-      if (backupData.data.devices) devices.value = backupData.data.devices;
-      if (backupData.data.scenes) scenes.value = backupData.data.scenes;
-      if (backupData.data.rooms) rooms.value = backupData.data.rooms;
-      if (backupData.data.deviceRecords) deviceRecords.value = backupData.data.deviceRecords;
-      if (backupData.data.systemLogs) systemLogs.value = backupData.data.systemLogs;
-      if (backupData.data.profile) profileForm.value = { ...profileForm.value, ...backupData.data.profile };
-      
-      // Save to localStorage
-      localStorage.setItem('devices', JSON.stringify(devices.value));
-      localStorage.setItem('scenes', JSON.stringify(scenes.value));
-      localStorage.setItem('rooms', JSON.stringify(rooms.value));
-      localStorage.setItem('deviceRecords', JSON.stringify(deviceRecords.value));
-      localStorage.setItem('systemLogs', JSON.stringify(systemLogs.value));
-      localStorage.setItem('profile', JSON.stringify(profileForm.value));
-      
-    } else if (restoreOptions.value.mode === 'merge') {
-      // Merge with existing data
-      if (backupData.data.devices) {
-        const existingIds = new Set(devices.value.map(d => d.id));
-        const newDevices = backupData.data.devices.filter(d => !existingIds.has(d.id));
-        devices.value.push(...newDevices);
-      }
-      
-      if (backupData.data.scenes) {
-        const existingIds = new Set(scenes.value.map(s => s.id));
-        const newScenes = backupData.data.scenes.filter(s => !existingIds.has(s.id));
-        scenes.value.push(...newScenes);
-      }
-      
-      // Save merged data
-      localStorage.setItem('devices', JSON.stringify(devices.value));
-      localStorage.setItem('scenes', JSON.stringify(scenes.value));
-    }
-    
-    // Refresh UI
-    await refreshAll();
-    
-    showRestoreDialog.value = false;
-    selectedBackupFile.value = null;
-    
-    ElMessage.success('Backup restaurado com sucesso!');
-    
-  } catch (err) {
-    console.error('Error restoring backup:', err);
-    ElMessage.error(`Erro ao restaurar backup: ${err.message}`);
-  } finally {
-    isRestoring.value = false;
-  }
-};
-
-const readFileContent = (file) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target.result);
-    reader.onerror = (e) => reject(new Error('Erro ao ler arquivo'));
-    reader.readAsText(file);
-  });
-};
-
-const formatFileSize = (bytes) => {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-};
-
-// Enhanced device control with rate limiting
-const toggleDeviceWithRateLimit = async (device) => {
-  try {
-    // Check if device is in cooldown or has queued controls
-    const queueStatus = homeAssistantClient.getDeviceControlQueueStatus(device.id);
-    
-    if (queueStatus.inCooldown) {
-      const remainingSeconds = Math.ceil(queueStatus.cooldownRemaining / 1000);
-      ElMessage.warning(`Dispositivo em cooldown. Aguarde ${remainingSeconds} segundos.`);
-      return;
-    }
-    
-    if (queueStatus.queuedCount >= 3) {
-      ElMessage.warning('Muitas operações pendentes para este dispositivo. Aguarde as operações anteriores terminarem.');
-      return;
-    }
-
-    // Use rate-limited toggle
-    await homeAssistantClient.toggleDeviceWithRateLimit(device.id, device.data.state);
-    
-    // Update device state optimistically
-    device.data.state = !device.data.state;
-    
-    // Log the action for analytics
-    homeAssistantClient.logDeviceAction(device.id, 'turnOnOff', device.data.state, true);
-    
-    // Log system event
-    homeAssistantClient.logSystemEvent('info', `Device ${device.name} ${device.data.state ? 'turned on' : 'turned off'}`);
-    
-    ElMessage.success(`Dispositivo ${device.name} ${device.data.state ? 'ligado' : 'desligado'}!`);
-    
-  } catch (err) {
-    // Log failed action
-    homeAssistantClient.logDeviceAction(device.id, 'turnOnOff', !device.data.state, false);
-    
-    // Log error
-    homeAssistantClient.logSystemEvent('error', `Failed to control device ${device.name}`, { error: err.message });
-    
-    ElMessage.error(`Erro ao controlar dispositivo: ${err.message}`);
-  }
-};
-
-// Enhanced scene trigger with rate limiting
-const triggerSceneWithRateLimit = async (scene) => {
-  try {
-    // Use rate-limited scene trigger
-    await homeAssistantClient.triggerSceneWithRateLimit(scene.id);
-    
-    // Log the action for analytics
-    homeAssistantClient.logDeviceAction(scene.id, 'triggerScene', true, true);
-    
-    // Log system event
-    homeAssistantClient.logSystemEvent('info', `Scene ${scene.name} triggered`);
-    
-    ElMessage.success(`Cena "${scene.name}" ativada!`);
-  } catch (err) {
-    // Log failed action
-    homeAssistantClient.logDeviceAction(scene.id, 'triggerScene', true, false);
-    
-    // Log error
-    homeAssistantClient.logSystemEvent('error', `Failed to trigger scene ${scene.name}`, { error: err.message });
-    
-    ElMessage.error(`Erro ao ativar cena: ${err.message}`);
-  }
-};
 </script>
 
 <style scoped>

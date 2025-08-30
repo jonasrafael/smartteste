@@ -432,6 +432,59 @@
             </el-form-item>
           </el-form>
         </div>
+
+        <!-- Backup and Restore -->
+        <div class="backup-section">
+          <el-card>
+            <template #header>
+              <span>💾 Backup e Restauração</span>
+            </template>
+            
+            <div class="backup-info">
+              <p>Faça backup de todos os dados da aplicação ou restaure de um backup anterior.</p>
+              
+              <div class="backup-actions">
+                <el-button 
+                  type="success" 
+                  size="large"
+                  @click="createBackup"
+                  :loading="isCreatingBackup"
+                >
+                  <i class="material-icons-round">cloud_download</i>
+                  Criar Backup Completo
+                </el-button>
+                
+                <el-button 
+                  type="warning" 
+                  size="large"
+                  @click="showRestoreDialog"
+                >
+                  <i class="material-icons-round">cloud_upload</i>
+                  Restaurar de Backup
+                </el-button>
+                
+                <el-button 
+                  type="info" 
+                  size="large"
+                  @click="showBackupInfo"
+                >
+                  <i class="material-icons-round">info</i>
+                  Informações do Backup
+                </el-button>
+              </div>
+              
+              <div v-if="lastBackup" class="last-backup-info">
+                <el-alert
+                  title="Último backup realizado"
+                  :description="`Data: ${formatTime(lastBackup.timestamp)} | Tamanho: ${formatFileSize(lastBackup.size)} | Itens: ${lastBackup.itemCount}`"
+                  type="success"
+                  show-icon
+                  :closable="false"
+                />
+              </div>
+            </div>
+          </el-card>
+        </div>
       </el-tab-pane>
 
     </el-tabs>
@@ -566,39 +619,6 @@ const tuyaEventCounts = ref({
 // Device control queue status
 const deviceQueueStatus = ref(new Map())
 
-// Backup system state
-const showBackupDialog = ref(false)
-const showRestoreDialog = ref(false)
-const showBackupInfoDialog = ref(false)
-const isCreatingBackup = ref(false)
-const isDownloading = ref(false)
-const isRestoring = ref(false)
-const lastBackup = ref(null)
-const selectedBackupFile = ref(null)
-
-// Backup options
-const backupOptions = ref({
-  includeSensitive: false,
-  compress: true,
-  encrypt: false
-})
-
-// Restore options
-const restoreOptions = ref({
-  mode: 'merge',
-  backupBefore: true
-})
-
-// Backup summary
-const backupSummary = ref({
-  devices: 0,
-  scenes: 0,
-  rooms: 0,
-  records: 0,
-  logs: 0,
-  settings: 0
-})
-
 const devicesSorted = computed(() => {
   const order = { true: 0, undefined: 1, false: 2 }
   return devices.value.slice().sort((d1, d2) =>
@@ -637,16 +657,6 @@ const loginForm = ref({ username: '', password: '' })
     if (wasMonitoring) {
       // Restart monitoring if it was active before
       startTuyaMonitoring()
-    }
-    
-    // Load last backup info
-    const savedLastBackup = localStorage.getItem('lastBackup')
-    if (savedLastBackup) {
-      try {
-        lastBackup.value = JSON.parse(savedLastBackup)
-      } catch (err) {
-        console.error('Error loading last backup info:', err)
-      }
     }
   })
 
@@ -1024,244 +1034,6 @@ const updateDeviceQueueStatus = () => {
   } catch (err) {
     console.error('Error updating device queue status:', err);
   }
-};
-
-// Backup and restore functions
-const createBackup = async () => {
-  try {
-    isCreatingBackup.value = true;
-    
-    // Collect all data for backup
-    const backupData = {
-      version: '1.0.0',
-      timestamp: Date.now(),
-      metadata: {
-        app: 'Smart Life WebApp Enhanced',
-        user: profileForm.value.username,
-        region: profileForm.value.region
-      },
-      data: {
-        devices: devices.value,
-        scenes: scenes.value,
-        rooms: rooms.value,
-        deviceRecords: deviceRecords.value,
-        systemLogs: systemLogs.value,
-        profile: profileForm.value,
-        monitoring: {
-          isActive: isMonitoringActive.value,
-          eventCounts: tuyaEventCounts.value
-        }
-      }
-    };
-    
-    // Update backup summary
-    backupSummary.value = {
-      devices: devices.value.length,
-      scenes: scenes.value.length,
-      rooms: rooms.value.length,
-      records: deviceRecords.value.length,
-      logs: systemLogs.value.length,
-      settings: 1
-    };
-    
-    // Show backup dialog
-    showBackupDialog.value = true;
-    
-    ElMessage.success('Backup preparado com sucesso!');
-    
-  } catch (err) {
-    console.error('Error creating backup:', err);
-    ElMessage.error('Erro ao criar backup');
-  } finally {
-    isCreatingBackup.value = false;
-  }
-};
-
-const downloadBackup = async () => {
-  try {
-    isDownloading.value = true;
-    
-    // Create backup data
-    const backupData = {
-      version: '1.0.0',
-      timestamp: Date.now(),
-      metadata: {
-        app: 'Smart Life WebApp Enhanced',
-        user: profileForm.value.username,
-        region: profileForm.value.region
-      },
-      data: {
-        devices: devices.value,
-        scenes: scenes.value,
-        rooms: rooms.value,
-        deviceRecords: deviceRecords.value,
-        systemLogs: systemLogs.value,
-        profile: profileForm.value,
-        monitoring: {
-          isActive: isMonitoringActive.value,
-          eventCounts: tuyaEventCounts.value
-        }
-      }
-    };
-    
-    // Convert to JSON
-    let backupContent = JSON.stringify(backupData, null, 2);
-    let fileName = `smart-life-backup-${new Date().toISOString().split('T')[0]}.json`;
-    
-    // Handle compression if enabled
-    if (backupOptions.value.compress) {
-      // Simple compression - remove unnecessary whitespace
-      backupContent = JSON.stringify(backupData);
-      fileName = fileName.replace('.json', '-compressed.json');
-    }
-    
-    // Handle encryption if enabled
-    if (backupOptions.value.encrypt) {
-      // Simple encryption - base64 encoding (for demo purposes)
-      backupContent = btoa(backupContent);
-      fileName = fileName.replace('.json', '-encrypted.txt');
-    }
-    
-    // Create and download file
-    const blob = new Blob([backupContent], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    
-    // Update last backup info
-    lastBackup.value = {
-      timestamp: Date.now(),
-      size: blob.size,
-      itemCount: Object.keys(backupData.data).length
-    };
-    
-    // Save backup info to localStorage
-    localStorage.setItem('lastBackup', JSON.stringify(lastBackup.value));
-    
-    showBackupDialog.value = false;
-    ElMessage.success('Backup baixado com sucesso!');
-    
-  } catch (err) {
-    console.error('Error downloading backup:', err);
-    ElMessage.error('Erro ao baixar backup');
-  } finally {
-    isDownloading.value = false;
-  }
-};
-
-const handleBackupFileSelect = (file) => {
-  selectedBackupFile.value = file.raw;
-};
-
-const restoreBackup = async () => {
-  if (!selectedBackupFile.value) {
-    ElMessage.warning('Selecione um arquivo de backup primeiro');
-    return;
-  }
-  
-  try {
-    isRestoring.value = true;
-    
-    // Read file content
-    const fileContent = await readFileContent(selectedBackupFile.value);
-    
-    // Parse backup data
-    let backupData;
-    try {
-      backupData = JSON.parse(fileContent);
-    } catch (err) {
-      // Try to decode if encrypted
-      try {
-        const decoded = atob(fileContent);
-        backupData = JSON.parse(decoded);
-      } catch (decodeErr) {
-        throw new Error('Arquivo de backup inválido ou corrompido');
-      }
-    }
-    
-    // Validate backup structure
-    if (!backupData.version || !backupData.data) {
-      throw new Error('Estrutura de backup inválida');
-    }
-    
-    // Create backup before restore if enabled
-    if (restoreOptions.value.backupBefore) {
-      await createBackup();
-    }
-    
-    // Restore data based on mode
-    if (restoreOptions.value.mode === 'replace') {
-      // Replace all data
-      if (backupData.data.devices) devices.value = backupData.data.devices;
-      if (backupData.data.scenes) scenes.value = backupData.data.scenes;
-      if (backupData.data.rooms) rooms.value = backupData.data.rooms;
-      if (backupData.data.deviceRecords) deviceRecords.value = backupData.data.deviceRecords;
-      if (backupData.data.systemLogs) systemLogs.value = backupData.data.systemLogs;
-      if (backupData.data.profile) profileForm.value = { ...profileForm.value, ...backupData.data.profile };
-      
-      // Save to localStorage
-      localStorage.setItem('devices', JSON.stringify(devices.value));
-      localStorage.setItem('scenes', JSON.stringify(scenes.value));
-      localStorage.setItem('rooms', JSON.stringify(rooms.value));
-      localStorage.setItem('deviceRecords', JSON.stringify(deviceRecords.value));
-      localStorage.setItem('systemLogs', JSON.stringify(systemLogs.value));
-      localStorage.setItem('profile', JSON.stringify(profileForm.value));
-      
-    } else if (restoreOptions.value.mode === 'merge') {
-      // Merge with existing data
-      if (backupData.data.devices) {
-        const existingIds = new Set(devices.value.map(d => d.id));
-        const newDevices = backupData.data.devices.filter(d => !existingIds.has(d.id));
-        devices.value.push(...newDevices);
-      }
-      
-      if (backupData.data.scenes) {
-        const existingIds = new Set(scenes.value.map(s => s.id));
-        const newScenes = backupData.data.scenes.filter(s => !existingIds.has(s.id));
-        scenes.value.push(...newScenes);
-      }
-      
-      // Save merged data
-      localStorage.setItem('devices', JSON.stringify(devices.value));
-      localStorage.setItem('scenes', JSON.stringify(scenes.value));
-    }
-    
-    // Refresh UI
-    await refreshAll();
-    
-    showRestoreDialog.value = false;
-    selectedBackupFile.value = null;
-    
-    ElMessage.success('Backup restaurado com sucesso!');
-    
-  } catch (err) {
-    console.error('Error restoring backup:', err);
-    ElMessage.error(`Erro ao restaurar backup: ${err.message}`);
-  } finally {
-    isRestoring.value = false;
-  }
-};
-
-const readFileContent = (file) => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (e) => resolve(e.target.result);
-    reader.onerror = (e) => reject(new Error('Erro ao ler arquivo'));
-    reader.readAsText(file);
-  });
-};
-
-const formatFileSize = (bytes) => {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
 // Enhanced device control with rate limiting

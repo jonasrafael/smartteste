@@ -638,16 +638,6 @@ const loginForm = ref({ username: '', password: '' })
       // Restart monitoring if it was active before
       startTuyaMonitoring()
     }
-    
-    // Load last backup info
-    const savedLastBackup = localStorage.getItem('lastBackup')
-    if (savedLastBackup) {
-      try {
-        lastBackup.value = JSON.parse(savedLastBackup)
-      } catch (err) {
-        console.error('Error loading last backup info:', err)
-      }
-    }
   })
 
 // Watch for analytics period changes
@@ -1772,6 +1762,107 @@ h2 {
 .device-queue-tooltip {
   font-size: 11px;
   max-width: 200px;
+}
+
+/* Backup system styles */
+.backup-section {
+  margin-top: 30px;
+}
+
+.backup-info p {
+  color: #606266;
+  margin-bottom: 20px;
+  line-height: 1.6;
+}
+
+.backup-actions {
+  display: flex;
+  gap: 15px;
+  margin-bottom: 25px;
+  flex-wrap: wrap;
+}
+
+.last-backup-info {
+  margin-top: 20px;
+}
+
+.backup-dialog {
+  padding: 20px 0;
+}
+
+.backup-summary h3 {
+  margin-bottom: 20px;
+  color: #303133;
+}
+
+.backup-options h4 {
+  margin: 30px 0 20px 0;
+  color: #303133;
+}
+
+.option-help {
+  font-size: 12px;
+  color: #909399;
+  margin-left: 10px;
+}
+
+.restore-dialog {
+  padding: 20px 0;
+}
+
+.backup-upload {
+  border: 2px dashed #d9d9d9;
+  border-radius: 6px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: border-color 0.3s;
+}
+
+.backup-upload:hover {
+  border-color: #409eff;
+}
+
+.backup-upload .el-upload__text {
+  color: #606266;
+  font-size: 14px;
+  text-align: center;
+  margin: 20px 0 10px 0;
+}
+
+.backup-upload .el-upload__tip {
+  font-size: 12px;
+  color: #909399;
+  text-align: center;
+}
+
+.backup-file-info {
+  margin-top: 20px;
+}
+
+.restore-options h4 {
+  margin: 20px 0 15px 0;
+  color: #303133;
+}
+
+.backup-info-dialog h3 {
+  color: #303133;
+  margin: 20px 0 15px 0;
+}
+
+.backup-info-dialog ul {
+  padding-left: 20px;
+  margin-bottom: 20px;
+}
+
+.backup-info-dialog li {
+  margin-bottom: 8px;
+  line-height: 1.5;
+  color: #606266;
+}
+
+.backup-info-dialog strong {
+  color: #303133;
 }
 
 /* Material Icons */

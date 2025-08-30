@@ -1103,20 +1103,16 @@ function HomeAssistantClient(session) {
       });
 
       ensureSuccess(response);
-
+      
       const stats = response.data.payload;
-
+      
       // Log system statistics
-      this.logSystemEvent("info", "Retrieved system statistics from Tuya API", {
-        stats,
-      });
-
+      this.logSystemEvent('info', 'Retrieved system statistics from Tuya API', { stats });
+      
       return stats;
     } catch (err) {
       console.error("Error getting system stats:", err);
-      this.logSystemEvent("error", "Failed to get system statistics", {
-        error: err.message,
-      });
+      this.logSystemEvent('error', 'Failed to get system statistics', { error: err.message });
       return null;
     }
   };
@@ -1127,14 +1123,12 @@ function HomeAssistantClient(session) {
       this.eventMonitoringInterval = setInterval(async () => {
         await this.captureTuyaEvents(callback);
       }, 3000); // Update every 3 seconds for real-time events
-
-      this.logSystemEvent("info", "Tuya event monitoring started");
+      
+      this.logSystemEvent('info', 'Tuya event monitoring started');
       return true;
     } catch (err) {
       console.error("Error starting Tuya event monitoring:", err);
-      this.logSystemEvent("error", "Failed to start Tuya event monitoring", {
-        error: err.message,
-      });
+      this.logSystemEvent('error', 'Failed to start Tuya event monitoring', { error: err.message });
       return false;
     }
   };
@@ -1144,7 +1138,7 @@ function HomeAssistantClient(session) {
     if (this.eventMonitoringInterval) {
       clearInterval(this.eventMonitoringInterval);
       this.eventMonitoringInterval = null;
-      this.logSystemEvent("info", "Tuya event monitoring stopped");
+      this.logSystemEvent('info', 'Tuya event monitoring stopped');
     }
   };
 
@@ -1161,21 +1155,20 @@ function HomeAssistantClient(session) {
         automations: await this.getAutomationEvents(),
         alerts: await this.getSystemAlerts(),
         notifications: await this.getSystemNotifications(),
-        deviceChanges: await this.getDeviceChangeEvents(),
+        deviceChanges: await this.getDeviceChangeEvents()
       };
 
       // Process and log all events
       await this.processTuyaEvents(events);
 
       // Call callback if provided
-      if (callback && typeof callback === "function") {
+      if (callback && typeof callback === 'function') {
         callback(events);
       }
+
     } catch (err) {
       console.error("Error capturing Tuya events:", err);
-      this.logSystemEvent("error", "Failed to capture Tuya events", {
-        error: err.message,
-      });
+      this.logSystemEvent('error', 'Failed to capture Tuya events', { error: err.message });
     }
   };
 
@@ -1197,7 +1190,7 @@ function HomeAssistantClient(session) {
       });
 
       ensureSuccess(response);
-
+      
       const devices = response.data.payload.devices || [];
       const events = [];
 
@@ -1208,22 +1201,19 @@ function HomeAssistantClient(session) {
           online: device.online,
           state: device.state,
           lastSeen: device.lastSeen,
-          timestamp: new Date().toISOString(),
+          timestamp: new Date().toISOString()
         };
 
         // Check for status changes
         const previousStatus = this.getPreviousDeviceStatus(device.id);
-        const changes = this.detectDeviceStatusChanges(
-          previousStatus,
-          currentStatus
-        );
-
+        const changes = this.detectDeviceStatusChanges(previousStatus, currentStatus);
+        
         if (changes.length > 0) {
           events.push({
-            type: "device_status_change",
+            type: 'device_status_change',
             device: currentStatus,
             changes: changes,
-            timestamp: new Date().toISOString(),
+            timestamp: new Date().toISOString()
           });
         }
 
@@ -1256,7 +1246,7 @@ function HomeAssistantClient(session) {
       });
 
       ensureSuccess(response);
-
+      
       const executions = response.data.payload.executions || [];
       const events = [];
 
@@ -1264,13 +1254,13 @@ function HomeAssistantClient(session) {
         // Check if this is a new execution
         if (!this.isSceneExecutionKnown(execution.id)) {
           events.push({
-            type: "scene_executed",
+            type: 'scene_executed',
             sceneId: execution.id,
             sceneName: execution.name,
-            executedBy: execution.executedBy || "system",
+            executedBy: execution.executedBy || 'system',
             timestamp: execution.timestamp || new Date().toISOString(),
             success: execution.success !== false,
-            details: execution,
+            details: execution
           });
 
           // Mark as known
@@ -1303,32 +1293,26 @@ function HomeAssistantClient(session) {
       });
 
       ensureSuccess(response);
-
+      
       const automations = response.data.payload.automations || [];
       const events = [];
 
       for (const automation of automations) {
         // Check for automation triggers
-        if (
-          automation.lastTriggered &&
-          !this.isAutomationEventKnown(automation.id, automation.lastTriggered)
-        ) {
+        if (automation.lastTriggered && !this.isAutomationEventKnown(automation.id, automation.lastTriggered)) {
           events.push({
-            type: "automation_triggered",
+            type: 'automation_triggered',
             automationId: automation.id,
             automationName: automation.name,
             trigger: automation.trigger,
             lastTriggered: automation.lastTriggered,
             timestamp: new Date().toISOString(),
             conditions: automation.conditions,
-            actions: automation.actions,
+            actions: automation.actions
           });
 
           // Mark as known
-          this.markAutomationEventAsKnown(
-            automation.id,
-            automation.lastTriggered
-          );
+          this.markAutomationEventAsKnown(automation.id, automation.lastTriggered);
         }
       }
 
@@ -1357,7 +1341,7 @@ function HomeAssistantClient(session) {
       });
 
       ensureSuccess(response);
-
+      
       const alerts = response.data.payload.alerts || [];
       const events = [];
 
@@ -1365,14 +1349,14 @@ function HomeAssistantClient(session) {
         // Check if this is a new alert
         if (!this.isAlertKnown(alert.id)) {
           events.push({
-            type: "system_alert",
+            type: 'system_alert',
             alertId: alert.id,
-            level: alert.level || "info",
+            level: alert.level || 'info',
             message: alert.message,
             category: alert.category,
             timestamp: alert.timestamp || new Date().toISOString(),
             acknowledged: alert.acknowledged || false,
-            details: alert,
+            details: alert
           });
 
           // Mark as known
@@ -1405,7 +1389,7 @@ function HomeAssistantClient(session) {
       });
 
       ensureSuccess(response);
-
+      
       const notifications = response.data.payload.notifications || [];
       const events = [];
 
@@ -1413,15 +1397,15 @@ function HomeAssistantClient(session) {
         // Check if this is a new notification
         if (!this.isNotificationKnown(notification.id)) {
           events.push({
-            type: "system_notification",
+            type: 'system_notification',
             notificationId: notification.id,
             title: notification.title,
             message: notification.message,
-            priority: notification.priority || "normal",
+            priority: notification.priority || 'normal',
             timestamp: notification.timestamp || new Date().toISOString(),
             read: notification.read || false,
             category: notification.category,
-            details: notification,
+            details: notification
           });
 
           // Mark as known
@@ -1454,7 +1438,7 @@ function HomeAssistantClient(session) {
       });
 
       ensureSuccess(response);
-
+      
       const changes = response.data.payload.changes || [];
       const events = [];
 
@@ -1462,7 +1446,7 @@ function HomeAssistantClient(session) {
         // Check if this is a new change
         if (!this.isDeviceChangeKnown(change.id)) {
           events.push({
-            type: "device_change",
+            type: 'device_change',
             changeId: change.id,
             deviceId: change.deviceId,
             deviceName: change.deviceName,
@@ -1471,8 +1455,8 @@ function HomeAssistantClient(session) {
             oldValue: change.oldValue,
             newValue: change.newValue,
             timestamp: change.timestamp || new Date().toISOString(),
-            source: change.source || "unknown",
-            details: change,
+            source: change.source || 'unknown',
+            details: change
           });
 
           // Mark as known
@@ -1490,10 +1474,7 @@ function HomeAssistantClient(session) {
   // Helper functions for tracking known events
   this.getPreviousDeviceStatus = (deviceId) => {
     try {
-      return (
-        JSON.parse(localStorage.getItem(`tuya_device_status_${deviceId}`)) ||
-        null
-      );
+      return JSON.parse(localStorage.getItem(`tuya_device_status_${deviceId}`)) || null;
     } catch (err) {
       return null;
     }
@@ -1501,10 +1482,7 @@ function HomeAssistantClient(session) {
 
   this.updatePreviousDeviceStatus = (deviceId, status) => {
     try {
-      localStorage.setItem(
-        `tuya_device_status_${deviceId}`,
-        JSON.stringify(status)
-      );
+      localStorage.setItem(`tuya_device_status_${deviceId}`, JSON.stringify(status));
     } catch (err) {
       console.error("Error updating previous device status:", err);
     }
@@ -1512,34 +1490,33 @@ function HomeAssistantClient(session) {
 
   this.detectDeviceStatusChanges = (previous, current) => {
     if (!previous) return [];
-
+    
     const changes = [];
-
+    
     if (previous.online !== current.online) {
       changes.push({
-        type: "online_status",
+        type: 'online_status',
         from: previous.online,
         to: current.online,
-        message: current.online ? "Device came online" : "Device went offline",
+        message: current.online ? 'Device came online' : 'Device went offline'
       });
     }
-
+    
     if (previous.state !== current.state) {
       changes.push({
-        type: "power_state",
+        type: 'power_state',
         from: previous.state,
         to: current.state,
-        message: `Device ${current.state ? "turned on" : "turned off"}`,
+        message: `Device ${current.state ? 'turned on' : 'turned off'}`
       });
     }
-
+    
     return changes;
   };
 
   this.isSceneExecutionKnown = (executionId) => {
     try {
-      const known =
-        JSON.parse(localStorage.getItem("tuya_known_scene_executions")) || [];
+      const known = JSON.parse(localStorage.getItem('tuya_known_scene_executions')) || [];
       return known.includes(executionId);
     } catch (err) {
       return false;
@@ -1548,15 +1525,11 @@ function HomeAssistantClient(session) {
 
   this.markSceneExecutionAsKnown = (executionId) => {
     try {
-      const known =
-        JSON.parse(localStorage.getItem("tuya_known_scene_executions")) || [];
+      const known = JSON.parse(localStorage.getItem('tuya_known_scene_executions')) || [];
       known.push(executionId);
       // Keep only last 1000 known executions
       if (known.length > 1000) known.splice(0, known.length - 1000);
-      localStorage.setItem(
-        "tuya_known_scene_executions",
-        JSON.stringify(known)
-      );
+      localStorage.setItem('tuya_known_scene_executions', JSON.stringify(known));
     } catch (err) {
       console.error("Error marking scene execution as known:", err);
     }
@@ -1564,10 +1537,7 @@ function HomeAssistantClient(session) {
 
   this.isAutomationEventKnown = (automationId, lastTriggered) => {
     try {
-      const known =
-        JSON.parse(
-          localStorage.getItem(`tuya_known_automation_${automationId}`)
-        ) || [];
+      const known = JSON.parse(localStorage.getItem(`tuya_known_automation_${automationId}`)) || [];
       return known.includes(lastTriggered);
     } catch (err) {
       return false;
@@ -1576,17 +1546,11 @@ function HomeAssistantClient(session) {
 
   this.markAutomationEventAsKnown = (automationId, lastTriggered) => {
     try {
-      const known =
-        JSON.parse(
-          localStorage.getItem(`tuya_known_automation_${automationId}`)
-        ) || [];
+      const known = JSON.parse(localStorage.getItem(`tuya_known_automation_${automationId}`)) || [];
       known.push(lastTriggered);
       // Keep only last 100 known triggers per automation
       if (known.length > 100) known.splice(0, known.length - 100);
-      localStorage.setItem(
-        `tuya_known_automation_${automationId}`,
-        JSON.stringify(known)
-      );
+      localStorage.setItem(`tuya_known_automation_${automationId}`, JSON.stringify(known));
     } catch (err) {
       console.error("Error marking automation event as known:", err);
     }
@@ -1594,7 +1558,7 @@ function HomeAssistantClient(session) {
 
   this.isAlertKnown = (alertId) => {
     try {
-      const known = JSON.parse(localStorage.getItem("tuya_known_alerts")) || [];
+      const known = JSON.parse(localStorage.getItem('tuya_known_alerts')) || [];
       return known.includes(alertId);
     } catch (err) {
       return false;
@@ -1603,11 +1567,11 @@ function HomeAssistantClient(session) {
 
   this.markAlertAsKnown = (alertId) => {
     try {
-      const known = JSON.parse(localStorage.getItem("tuya_known_alerts")) || [];
+      const known = JSON.parse(localStorage.getItem('tuya_known_alerts')) || [];
       known.push(alertId);
       // Keep only last 500 known alerts
       if (known.length > 500) known.splice(0, known.length - 500);
-      localStorage.setItem("tuya_known_alerts", JSON.stringify(known));
+      localStorage.setItem('tuya_known_alerts', JSON.stringify(known));
     } catch (err) {
       console.error("Error marking alert as known:", err);
     }
@@ -1615,8 +1579,7 @@ function HomeAssistantClient(session) {
 
   this.isNotificationKnown = (notificationId) => {
     try {
-      const known =
-        JSON.parse(localStorage.getItem("tuya_known_notifications")) || [];
+      const known = JSON.parse(localStorage.getItem('tuya_known_notifications')) || [];
       return known.includes(notificationId);
     } catch (err) {
       return false;
@@ -1625,12 +1588,11 @@ function HomeAssistantClient(session) {
 
   this.markNotificationAsKnown = (notificationId) => {
     try {
-      const known =
-        JSON.parse(localStorage.getItem("tuya_known_notifications")) || [];
+      const known = JSON.parse(localStorage.getItem('tuya_known_notifications')) || [];
       known.push(notificationId);
       // Keep only last 1000 known notifications
       if (known.length > 1000) known.splice(0, known.length - 1000);
-      localStorage.setItem("tuya_known_notifications", JSON.stringify(known));
+      localStorage.setItem('tuya_known_notifications', JSON.stringify(known));
     } catch (err) {
       console.error("Error marking notification as known:", err);
     }
@@ -1638,8 +1600,7 @@ function HomeAssistantClient(session) {
 
   this.isDeviceChangeKnown = (changeId) => {
     try {
-      const known =
-        JSON.parse(localStorage.getItem("tuya_known_device_changes")) || [];
+      const known = JSON.parse(localStorage.getItem('tuya_known_device_changes')) || [];
       return known.includes(changeId);
     } catch (err) {
       return false;
@@ -1648,12 +1609,11 @@ function HomeAssistantClient(session) {
 
   this.markDeviceChangeAsKnown = (changeId) => {
     try {
-      const known =
-        JSON.parse(localStorage.getItem("tuya_known_device_changes")) || [];
+      const known = JSON.parse(localStorage.getItem('tuya_known_device_changes')) || [];
       known.push(changeId);
       // Keep only last 1000 known changes
       if (known.length > 1000) known.splice(0, known.length - 1000);
-      localStorage.setItem("tuya_known_device_changes", JSON.stringify(known));
+      localStorage.setItem('tuya_known_device_changes', JSON.stringify(known));
     } catch (err) {
       console.error("Error marking device change as known:", err);
     }
@@ -1663,15 +1623,15 @@ function HomeAssistantClient(session) {
   this.processTuyaEvents = async (events) => {
     try {
       let totalEvents = 0;
-
+      
       // Process each type of events
-      Object.keys(events).forEach((eventType) => {
+      Object.keys(events).forEach(eventType => {
         const eventList = events[eventType];
         if (eventList && eventList.length > 0) {
           totalEvents += eventList.length;
-
+          
           // Log each event
-          eventList.forEach((event) => {
+          eventList.forEach(event => {
             this.logTuyaEvent(event);
           });
         }
@@ -1679,18 +1639,17 @@ function HomeAssistantClient(session) {
 
       // Log summary if there are events
       if (totalEvents > 0) {
-        this.logSystemEvent("info", `Processed ${totalEvents} Tuya events`, {
+        this.logSystemEvent('info', `Processed ${totalEvents} Tuya events`, {
           eventCounts: Object.keys(events).reduce((acc, key) => {
             acc[key] = events[key]?.length || 0;
             return acc;
-          }, {}),
+          }, {})
         });
       }
+
     } catch (err) {
       console.error("Error processing Tuya events:", err);
-      this.logSystemEvent("error", "Failed to process Tuya events", {
-        error: err.message,
-      });
+      this.logSystemEvent('error', 'Failed to process Tuya events', { error: err.message });
     }
   };
 
@@ -1704,25 +1663,25 @@ function HomeAssistantClient(session) {
         message: this.formatEventMessage(event),
         details: event,
         timestamp: event.timestamp || new Date().toISOString(),
-        userId: "tuya_api",
-        source: "real_time_monitoring",
-        eventType: event.type,
+        userId: 'tuya_api',
+        source: 'real_time_monitoring',
+        eventType: event.type
       };
 
       // Add to system logs
-      const allLogs =
-        JSON.parse(localStorage.getItem("tuya_system_logs")) || [];
+      const allLogs = JSON.parse(localStorage.getItem('tuya_system_logs')) || [];
       allLogs.push(logEntry);
-
+      
       // Keep only last 1000 logs
       if (allLogs.length > 1000) {
         allLogs.splice(0, allLogs.length - 1000);
       }
-
-      localStorage.setItem("tuya_system_logs", JSON.stringify(allLogs));
+      
+      localStorage.setItem('tuya_system_logs', JSON.stringify(allLogs));
 
       // Also log to console for debugging
       console.log(`[TUYA EVENT] ${logEntry.message}`, event);
+      
     } catch (err) {
       console.error("Error logging Tuya event:", err);
     }
@@ -1731,324 +1690,45 @@ function HomeAssistantClient(session) {
   // Determine event level based on event type
   this.getEventLevel = (event) => {
     switch (event.type) {
-      case "system_alert":
-        return event.level || "warning";
-      case "device_status_change":
-        return event.changes?.some((c) => c.type === "online_status" && !c.to)
-          ? "warning"
-          : "info";
-      case "automation_triggered":
-        return "info";
-      case "scene_executed":
-        return "info";
-      case "device_change":
-        return "info";
+      case 'system_alert':
+        return event.level || 'warning';
+      case 'device_status_change':
+        return event.changes?.some(c => c.type === 'online_status' && !c.to) ? 'warning' : 'info';
+      case 'automation_triggered':
+        return 'info';
+      case 'scene_executed':
+        return 'info';
+      case 'device_change':
+        return 'info';
       default:
-        return "info";
+        return 'info';
     }
   };
 
   // Format event message for display
   this.formatEventMessage = (event) => {
     switch (event.type) {
-      case "device_status_change":
-        const changeMessages = event.changes?.map((c) => c.message) || [];
-        return `Device ${
-          event.device.deviceName
-        } status changed: ${changeMessages.join(", ")}`;
-
-      case "scene_executed":
+      case 'device_status_change':
+        const changeMessages = event.changes?.map(c => c.message) || [];
+        return `Device ${event.device.deviceName} status changed: ${changeMessages.join(', ')}`;
+      
+      case 'scene_executed':
         return `Scene "${event.sceneName}" executed by ${event.executedBy}`;
-
-      case "automation_triggered":
+      
+      case 'automation_triggered':
         return `Automation "${event.automationName}" triggered`;
-
-      case "system_alert":
+      
+      case 'system_alert':
         return `System Alert [${event.level.toUpperCase()}]: ${event.message}`;
-
-      case "system_notification":
+      
+      case 'system_notification':
         return `Notification: ${event.title} - ${event.message}`;
-
-      case "device_change":
+      
+      case 'device_change':
         return `Device ${event.deviceName} ${event.changeType}: ${event.property} changed from ${event.oldValue} to ${event.newValue}`;
-
+      
       default:
         return `Tuya Event: ${event.type}`;
-    }
-  };
-
-  // Device control rate limiting and debouncing
-  this.deviceControlQueue = new Map(); // Track pending controls per device
-  this.deviceControlCooldown = new Map(); // Track cooldown periods per device
-  this.CONTROL_COOLDOWN_MS = 2000; // 2 seconds cooldown between controls
-  this.MAX_QUEUED_CONTROLS = 3; // Maximum queued controls per device
-
-  // Enhanced device control with rate limiting
-  this.deviceControlWithRateLimit = async (
-    deviceId,
-    action,
-    fieldName,
-    fieldValue
-  ) => {
-    try {
-      // Check if device is in cooldown
-      const cooldownUntil = this.deviceControlCooldown.get(deviceId);
-      if (cooldownUntil && Date.now() < cooldownUntil) {
-        const remainingMs = cooldownUntil - Date.now();
-        throw new Error(
-          `Dispositivo em cooldown. Aguarde ${Math.ceil(
-            remainingMs / 1000
-          )} segundos antes de tentar novamente.`
-        );
-      }
-
-      // Check if there are too many queued controls
-      const queuedControls = this.deviceControlQueue.get(deviceId) || [];
-      if (queuedControls.length >= this.MAX_QUEUED_CONTROLS) {
-        throw new Error(
-          `Muitas operações pendentes para este dispositivo. Aguarde as operações anteriores terminarem.`
-        );
-      }
-
-      // Add control to queue
-      const controlId = Date.now().toString();
-      const controlPromise = new Promise((resolve, reject) => {
-        queuedControls.push({
-          id: controlId,
-          action,
-          fieldName,
-          fieldValue,
-          resolve,
-          reject,
-          timestamp: Date.now(),
-        });
-      });
-
-      this.deviceControlQueue.set(deviceId, queuedControls);
-
-      // Process queue if this is the only item
-      if (queuedControls.length === 1) {
-        this.processDeviceControlQueue(deviceId);
-      }
-
-      // Wait for this control to be processed
-      return await controlPromise;
-    } catch (err) {
-      // Log the rate limiting error
-      this.logSystemEvent(
-        "warning",
-        `Rate limiting applied to device ${deviceId}`,
-        {
-          deviceId,
-          action,
-          error: err.message,
-        }
-      );
-      throw err;
-    }
-  };
-
-  // Process device control queue
-  this.processDeviceControlQueue = async (deviceId) => {
-    const queuedControls = this.deviceControlQueue.get(deviceId) || [];
-
-    if (queuedControls.length === 0) return;
-
-    try {
-      // Get the next control from queue
-      const control = queuedControls[0];
-
-      // Execute the control
-      const result = await this.deviceControl(
-        control.deviceId || deviceId,
-        control.action,
-        control.fieldName,
-        control.fieldValue
-      );
-
-      // Resolve the promise
-      control.resolve(result);
-
-      // Remove from queue
-      queuedControls.splice(0, 1);
-      this.deviceControlQueue.set(deviceId, queuedControls);
-
-      // Set cooldown period
-      this.deviceControlCooldown.set(
-        deviceId,
-        Date.now() + this.CONTROL_COOLDOWN_MS
-      );
-
-      // Log successful control
-      this.logSystemEvent("info", `Device control executed successfully`, {
-        deviceId,
-        action: control.action,
-        queueLength: queuedControls.length,
-      });
-
-      // Process next control if any
-      if (queuedControls.length > 0) {
-        // Wait for cooldown before processing next control
-        setTimeout(() => {
-          this.processDeviceControlQueue(deviceId);
-        }, this.CONTROL_COOLDOWN_MS);
-      }
-    } catch (err) {
-      // Get the failed control
-      const control = queuedControls[0];
-
-      // Reject the promise
-      control.reject(err);
-
-      // Remove from queue
-      queuedControls.splice(0, 1);
-      this.deviceControlQueue.set(deviceId, queuedControls);
-
-      // Set cooldown period even on failure
-      this.deviceControlCooldown.set(
-        deviceId,
-        Date.now() + this.CONTROL_COOLDOWN_MS
-      );
-
-      // Log the error
-      this.logSystemEvent("error", `Device control failed`, {
-        deviceId,
-        action: control.action,
-        error: err.message,
-        queueLength: queuedControls.length,
-      });
-
-      // Process next control if any (with delay)
-      if (queuedControls.length > 0) {
-        setTimeout(() => {
-          this.processDeviceControlQueue(deviceId);
-        }, this.CONTROL_COOLDOWN_MS);
-      }
-    }
-  };
-
-  // Clear device control queue (useful for cleanup)
-  this.clearDeviceControlQueue = (deviceId) => {
-    const queuedControls = this.deviceControlQueue.get(deviceId) || [];
-
-    // Reject all pending controls
-    queuedControls.forEach((control) => {
-      control.reject(new Error("Device control queue cleared"));
-    });
-
-    // Clear the queue
-    this.deviceControlQueue.delete(deviceId);
-    this.deviceControlCooldown.delete(deviceId);
-
-    this.logSystemEvent("info", `Device control queue cleared`, { deviceId });
-  };
-
-  // Get device control queue status
-  this.getDeviceControlQueueStatus = (deviceId) => {
-    const queuedControls = this.deviceControlQueue.get(deviceId) || [];
-    const cooldownUntil = this.deviceControlCooldown.get(deviceId);
-
-    return {
-      queuedCount: queuedControls.length,
-      inCooldown: cooldownUntil && Date.now() < cooldownUntil,
-      cooldownRemaining: cooldownUntil
-        ? Math.max(0, cooldownUntil - Date.now())
-        : 0,
-      canAcceptNewControl:
-        queuedControls.length < this.MAX_QUEUED_CONTROLS &&
-        (!cooldownUntil || Date.now() >= cooldownUntil),
-    };
-  };
-
-  // Enhanced toggle device function with rate limiting
-  this.toggleDeviceWithRateLimit = async (deviceId, currentState) => {
-    try {
-      const newState = !currentState;
-
-      // Check queue status before proceeding
-      const queueStatus = this.getDeviceControlQueueStatus(deviceId);
-      if (!queueStatus.canAcceptNewControl) {
-        if (queueStatus.inCooldown) {
-          throw new Error(
-            `Dispositivo em cooldown. Aguarde ${Math.ceil(
-              queueStatus.cooldownRemaining / 1000
-            )} segundos.`
-          );
-        } else {
-          throw new Error(
-            `Fila de controle cheia. Aguarde as operações anteriores terminarem.`
-          );
-        }
-      }
-
-      // Use rate-limited control
-      const result = await this.deviceControlWithRateLimit(
-        deviceId,
-        "turnOnOff",
-        "state",
-        newState
-      );
-
-      // Log successful toggle
-      this.logSystemEvent("info", `Device toggled successfully`, {
-        deviceId,
-        fromState: currentState,
-        toState: newState,
-      });
-
-      return result;
-    } catch (err) {
-      // Log failed toggle
-      this.logSystemEvent("error", `Device toggle failed`, {
-        deviceId,
-        currentState,
-        error: err.message,
-      });
-
-      throw err;
-    }
-  };
-
-  // Enhanced scene trigger with rate limiting
-  this.triggerSceneWithRateLimit = async (sceneId) => {
-    try {
-      // Check if scene is already being triggered
-      const sceneKey = `scene_${sceneId}`;
-      const cooldownUntil = this.deviceControlCooldown.get(sceneKey);
-
-      if (cooldownUntil && Date.now() < cooldownUntil) {
-        const remainingMs = cooldownUntil - Date.now();
-        throw new Error(
-          `Cena em cooldown. Aguarde ${Math.ceil(
-            remainingMs / 1000
-          )} segundos antes de tentar novamente.`
-        );
-      }
-
-      // Set cooldown for scene
-      this.deviceControlCooldown.set(
-        sceneKey,
-        Date.now() + this.CONTROL_COOLDOWN_MS
-      );
-
-      // Execute scene
-      const result = await this.triggerScene(sceneId);
-
-      // Log successful scene trigger
-      this.logSystemEvent("info", `Scene triggered successfully`, {
-        sceneId,
-        cooldownSet: true,
-      });
-
-      return result;
-    } catch (err) {
-      // Log failed scene trigger
-      this.logSystemEvent("error", `Scene trigger failed`, {
-        sceneId,
-        error: err.message,
-      });
-
-      throw err;
     }
   };
 }

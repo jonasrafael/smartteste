@@ -238,20 +238,11 @@ function HomeAssistantClient(session) {
             return processedDevice;
           })
           .filter((device) => {
-            // Filter out automations, scenes, and scene-like devices
             const isAutomation = device.type === "automation";
-            const isScene = device.type === "scene";
-            const isSceneLike =
-              device.name.toLowerCase().includes("scene") ||
-              device.name.toLowerCase().includes("cena") ||
-              device.name.toLowerCase().includes("automation") ||
-              device.name.toLowerCase().includes("automação");
-
-            const shouldFilter = isAutomation || isScene || isSceneLike;
             console.log(
-              `[DEVICE DISCOVERY] Device ${device.name} (${device.type}) - Filtered: ${shouldFilter}`
+              `[DEVICE DISCOVERY] Device ${device.name} (${device.type}) - Automation: ${isAutomation}`
             );
-            return !shouldFilter;
+            return !isAutomation;
           });
 
         console.log(

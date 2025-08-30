@@ -1784,30 +1784,19 @@ function HomeAssistantClient(session) {
   this.MAX_QUEUED_CONTROLS = 3; // Maximum queued controls per device
 
   // Enhanced device control with rate limiting
-  this.deviceControlWithRateLimit = async (
-    deviceId,
-    action,
-    fieldName,
-    fieldValue
-  ) => {
+  this.deviceControlWithRateLimit = async (deviceId, action, fieldName, fieldValue) => {
     try {
       // Check if device is in cooldown
       const cooldownUntil = this.deviceControlCooldown.get(deviceId);
       if (cooldownUntil && Date.now() < cooldownUntil) {
         const remainingMs = cooldownUntil - Date.now();
-        throw new Error(
-          `Dispositivo em cooldown. Aguarde ${Math.ceil(
-            remainingMs / 1000
-          )} segundos antes de tentar novamente.`
-        );
+        throw new Error(`Dispositivo em cooldown. Aguarde ${Math.ceil(remainingMs / 1000)} segundos antes de tentar novamente.`);
       }
 
       // Check if there are too many queued controls
       const queuedControls = this.deviceControlQueue.get(deviceId) || [];
       if (queuedControls.length >= this.MAX_QUEUED_CONTROLS) {
-        throw new Error(
-          `Muitas operações pendentes para este dispositivo. Aguarde as operações anteriores terminarem.`
-        );
+        throw new Error(`Muitas operações pendentes para este dispositivo. Aguarde as operações anteriores terminarem.`);
       }
 
       // Add control to queue
@@ -1820,7 +1809,7 @@ function HomeAssistantClient(session) {
           fieldValue,
           resolve,
           reject,
-          timestamp: Date.now(),
+          timestamp: Date.now()
         });
       });
 
@@ -1833,17 +1822,14 @@ function HomeAssistantClient(session) {
 
       // Wait for this control to be processed
       return await controlPromise;
+
     } catch (err) {
       // Log the rate limiting error
-      this.logSystemEvent(
-        "warning",
-        `Rate limiting applied to device ${deviceId}`,
-        {
-          deviceId,
-          action,
-          error: err.message,
-        }
-      );
+      this.logSystemEvent('warning', `Rate limiting applied to device ${deviceId}`, {
+        deviceId,
+        action,
+        error: err.message
+      });
       throw err;
     }
   };
@@ -1851,39 +1837,31 @@ function HomeAssistantClient(session) {
   // Process device control queue
   this.processDeviceControlQueue = async (deviceId) => {
     const queuedControls = this.deviceControlQueue.get(deviceId) || [];
-
+    
     if (queuedControls.length === 0) return;
 
     try {
       // Get the next control from queue
       const control = queuedControls[0];
-
+      
       // Execute the control
-      const result = await this.deviceControl(
-        control.deviceId || deviceId,
-        control.action,
-        control.fieldName,
-        control.fieldValue
-      );
-
+      const result = await this.deviceControl(control.deviceId || deviceId, control.action, control.fieldName, control.fieldValue);
+      
       // Resolve the promise
       control.resolve(result);
-
+      
       // Remove from queue
       queuedControls.splice(0, 1);
       this.deviceControlQueue.set(deviceId, queuedControls);
-
+      
       // Set cooldown period
-      this.deviceControlCooldown.set(
-        deviceId,
-        Date.now() + this.CONTROL_COOLDOWN_MS
-      );
-
+      this.deviceControlCooldown.set(deviceId, Date.now() + this.CONTROL_COOLDOWN_MS);
+      
       // Log successful control
-      this.logSystemEvent("info", `Device control executed successfully`, {
+      this.logSystemEvent('info', `Device control executed successfully`, {
         deviceId,
         action: control.action,
-        queueLength: queuedControls.length,
+        queueLength: queuedControls.length
       });
 
       // Process next control if any
@@ -1893,29 +1871,27 @@ function HomeAssistantClient(session) {
           this.processDeviceControlQueue(deviceId);
         }, this.CONTROL_COOLDOWN_MS);
       }
+
     } catch (err) {
       // Get the failed control
       const control = queuedControls[0];
-
+      
       // Reject the promise
       control.reject(err);
-
+      
       // Remove from queue
       queuedControls.splice(0, 1);
       this.deviceControlQueue.set(deviceId, queuedControls);
-
+      
       // Set cooldown period even on failure
-      this.deviceControlCooldown.set(
-        deviceId,
-        Date.now() + this.CONTROL_COOLDOWN_MS
-      );
-
+      this.deviceControlCooldown.set(deviceId, Date.now() + this.CONTROL_COOLDOWN_MS);
+      
       // Log the error
-      this.logSystemEvent("error", `Device control failed`, {
+      this.logSystemEvent('error', `Device control failed`, {
         deviceId,
         action: control.action,
         error: err.message,
-        queueLength: queuedControls.length,
+        queueLength: queuedControls.length
       });
 
       // Process next control if any (with delay)
@@ -1930,33 +1906,30 @@ function HomeAssistantClient(session) {
   // Clear device control queue (useful for cleanup)
   this.clearDeviceControlQueue = (deviceId) => {
     const queuedControls = this.deviceControlQueue.get(deviceId) || [];
-
+    
     // Reject all pending controls
-    queuedControls.forEach((control) => {
-      control.reject(new Error("Device control queue cleared"));
+    queuedControls.forEach(control => {
+      control.reject(new Error('Device control queue cleared'));
     });
-
+    
     // Clear the queue
     this.deviceControlQueue.delete(deviceId);
     this.deviceControlCooldown.delete(deviceId);
-
-    this.logSystemEvent("info", `Device control queue cleared`, { deviceId });
+    
+    this.logSystemEvent('info', `Device control queue cleared`, { deviceId });
   };
 
   // Get device control queue status
   this.getDeviceControlQueueStatus = (deviceId) => {
     const queuedControls = this.deviceControlQueue.get(deviceId) || [];
     const cooldownUntil = this.deviceControlCooldown.get(deviceId);
-
+    
     return {
       queuedCount: queuedControls.length,
       inCooldown: cooldownUntil && Date.now() < cooldownUntil,
-      cooldownRemaining: cooldownUntil
-        ? Math.max(0, cooldownUntil - Date.now())
-        : 0,
-      canAcceptNewControl:
-        queuedControls.length < this.MAX_QUEUED_CONTROLS &&
-        (!cooldownUntil || Date.now() >= cooldownUntil),
+      cooldownRemaining: cooldownUntil ? Math.max(0, cooldownUntil - Date.now()) : 0,
+      canAcceptNewControl: queuedControls.length < this.MAX_QUEUED_CONTROLS && 
+                          (!cooldownUntil || Date.now() >= cooldownUntil)
     };
   };
 
@@ -1964,47 +1937,42 @@ function HomeAssistantClient(session) {
   this.toggleDeviceWithRateLimit = async (deviceId, currentState) => {
     try {
       const newState = !currentState;
-
+      
       // Check queue status before proceeding
       const queueStatus = this.getDeviceControlQueueStatus(deviceId);
       if (!queueStatus.canAcceptNewControl) {
         if (queueStatus.inCooldown) {
-          throw new Error(
-            `Dispositivo em cooldown. Aguarde ${Math.ceil(
-              queueStatus.cooldownRemaining / 1000
-            )} segundos.`
-          );
+          throw new Error(`Dispositivo em cooldown. Aguarde ${Math.ceil(queueStatus.cooldownRemaining / 1000)} segundos.`);
         } else {
-          throw new Error(
-            `Fila de controle cheia. Aguarde as operações anteriores terminarem.`
-          );
+          throw new Error(`Fila de controle cheia. Aguarde as operações anteriores terminarem.`);
         }
       }
 
       // Use rate-limited control
       const result = await this.deviceControlWithRateLimit(
-        deviceId,
-        "turnOnOff",
-        "state",
+        deviceId, 
+        'turnOnOff', 
+        'state', 
         newState
       );
 
       // Log successful toggle
-      this.logSystemEvent("info", `Device toggled successfully`, {
+      this.logSystemEvent('info', `Device toggled successfully`, {
         deviceId,
         fromState: currentState,
-        toState: newState,
+        toState: newState
       });
 
       return result;
+
     } catch (err) {
       // Log failed toggle
-      this.logSystemEvent("error", `Device toggle failed`, {
+      this.logSystemEvent('error', `Device toggle failed`, {
         deviceId,
         currentState,
-        error: err.message,
+        error: err.message
       });
-
+      
       throw err;
     }
   };
@@ -2015,39 +1983,33 @@ function HomeAssistantClient(session) {
       // Check if scene is already being triggered
       const sceneKey = `scene_${sceneId}`;
       const cooldownUntil = this.deviceControlCooldown.get(sceneKey);
-
+      
       if (cooldownUntil && Date.now() < cooldownUntil) {
         const remainingMs = cooldownUntil - Date.now();
-        throw new Error(
-          `Cena em cooldown. Aguarde ${Math.ceil(
-            remainingMs / 1000
-          )} segundos antes de tentar novamente.`
-        );
+        throw new Error(`Cena em cooldown. Aguarde ${Math.ceil(remainingMs / 1000)} segundos antes de tentar novamente.`);
       }
 
       // Set cooldown for scene
-      this.deviceControlCooldown.set(
-        sceneKey,
-        Date.now() + this.CONTROL_COOLDOWN_MS
-      );
+      this.deviceControlCooldown.set(sceneKey, Date.now() + this.CONTROL_COOLDOWN_MS);
 
       // Execute scene
       const result = await this.triggerScene(sceneId);
 
       // Log successful scene trigger
-      this.logSystemEvent("info", `Scene triggered successfully`, {
+      this.logSystemEvent('info', `Scene triggered successfully`, {
         sceneId,
-        cooldownSet: true,
+        cooldownSet: true
       });
 
       return result;
+
     } catch (err) {
       // Log failed scene trigger
-      this.logSystemEvent("error", `Scene trigger failed`, {
+      this.logSystemEvent('error', `Scene trigger failed`, {
         sceneId,
-        error: err.message,
+        error: err.message
       });
-
+      
       throw err;
     }
   };

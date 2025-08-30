@@ -566,39 +566,6 @@ const tuyaEventCounts = ref({
 // Device control queue status
 const deviceQueueStatus = ref(new Map())
 
-// Backup system state
-const showBackupDialog = ref(false)
-const showRestoreDialog = ref(false)
-const showBackupInfoDialog = ref(false)
-const isCreatingBackup = ref(false)
-const isDownloading = ref(false)
-const isRestoring = ref(false)
-const lastBackup = ref(null)
-const selectedBackupFile = ref(null)
-
-// Backup options
-const backupOptions = ref({
-  includeSensitive: false,
-  compress: true,
-  encrypt: false
-})
-
-// Restore options
-const restoreOptions = ref({
-  mode: 'merge',
-  backupBefore: true
-})
-
-// Backup summary
-const backupSummary = ref({
-  devices: 0,
-  scenes: 0,
-  rooms: 0,
-  records: 0,
-  logs: 0,
-  settings: 0
-})
-
 const devicesSorted = computed(() => {
   const order = { true: 0, undefined: 1, false: 2 }
   return devices.value.slice().sort((d1, d2) =>
@@ -637,16 +604,6 @@ const loginForm = ref({ username: '', password: '' })
     if (wasMonitoring) {
       // Restart monitoring if it was active before
       startTuyaMonitoring()
-    }
-    
-    // Load last backup info
-    const savedLastBackup = localStorage.getItem('lastBackup')
-    if (savedLastBackup) {
-      try {
-        lastBackup.value = JSON.parse(savedLastBackup)
-      } catch (err) {
-        console.error('Error loading last backup info:', err)
-      }
     }
   })
 
@@ -1026,6 +983,80 @@ const updateDeviceQueueStatus = () => {
   }
 };
 
+// Enhanced device control with rate limiting
+const toggleDeviceWithRateLimit = async (device) => {
+  try {
+    // Check if device is in cooldown or has queued controls
+    const queueStatus = homeAssistantClient.getDeviceControlQueueStatus(device.id);
+    
+    if (queueStatus.inCooldown) {
+      const remainingSeconds = Math.ceil(queueStatus.cooldownRemaining / 1000);
+      ElMessage.warning(`Dispositivo em cooldown. Aguarde ${remainingSeconds} segundos.`);
+      return;
+    }
+    
+    if (queueStatus.queuedCount >= 3) {
+      ElMessage.warning('Muitas operações pendentes para este dispositivo. Aguarde as operações anteriores terminarem.');
+      return;
+    }
+
+    // Use rate-limited toggle
+    await homeAssistantClient.toggleDeviceWithRateLimit(device.id, device.data.state);
+    
+    // Update device state optimistically
+    device.data.state = !device.data.state;
+    
+    // Log the action for analytics
+    homeAssistantClient.logDeviceAction(device.id, 'turnOnOff', device.data.state, true);
+    
+    // Log system event
+    homeAssistantClient.logSystemEvent('info', `Device ${device.name} ${device.data.state ? 'turned on' : 'turned off'}`);
+    
+    ElMessage.success(`Dispositivo ${device.name} ${device.data.state ? 'ligado' : 'desligado'}!`);
+    
+  } catch (err) {
+    // Log failed action
+    homeAssistantClient.logDeviceAction(device.id, 'turnOnOff', !device.data.state, false);
+    
+    // Log error
+    homeAssistantClient.logSystemEvent('error', `Failed to control device ${device.name}`, { error: err.message });
+    
+    ElMessage.error(`Erro ao controlar dispositivo: ${err.message}`);
+  }
+};
+
+// Enhanced scene trigger with rate limiting
+const triggerSceneWithRateLimit = async (scene) => {
+  try {
+    // Use rate-limited scene trigger
+    await homeAssistantClient.triggerSceneWithRateLimit(scene.id);
+    
+    // Log the action for analytics
+    homeAssistantClient.logDeviceAction(scene.id, 'triggerScene', true, true);
+    
+    // Log system event
+    homeAssistantClient.logSystemEvent('info', `Scene ${scene.name} triggered`);
+    
+    ElMessage.success(`Cena "${scene.name}" ativada!`);
+  } catch (err) {
+    // Log failed action
+    homeAssistantClient.logDeviceAction(scene.id, 'triggerScene', true, false);
+    
+    // Log error
+    homeAssistantClient.logSystemEvent('error', `Failed to trigger scene ${scene.name}`, { error: err.message });
+    
+    ElMessage.error(`Erro ao ativar cena: ${err.message}`);
+  }
+};
+
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
+
 // Backup and restore functions
 const createBackup = async () => {
   try {
@@ -1254,80 +1285,6 @@ const readFileContent = (file) => {
     reader.onerror = (e) => reject(new Error('Erro ao ler arquivo'));
     reader.readAsText(file);
   });
-};
-
-const formatFileSize = (bytes) => {
-  if (bytes === 0) return '0 Bytes';
-  const k = 1024;
-  const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-  const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-};
-
-// Enhanced device control with rate limiting
-const toggleDeviceWithRateLimit = async (device) => {
-  try {
-    // Check if device is in cooldown or has queued controls
-    const queueStatus = homeAssistantClient.getDeviceControlQueueStatus(device.id);
-    
-    if (queueStatus.inCooldown) {
-      const remainingSeconds = Math.ceil(queueStatus.cooldownRemaining / 1000);
-      ElMessage.warning(`Dispositivo em cooldown. Aguarde ${remainingSeconds} segundos.`);
-      return;
-    }
-    
-    if (queueStatus.queuedCount >= 3) {
-      ElMessage.warning('Muitas operações pendentes para este dispositivo. Aguarde as operações anteriores terminarem.');
-      return;
-    }
-
-    // Use rate-limited toggle
-    await homeAssistantClient.toggleDeviceWithRateLimit(device.id, device.data.state);
-    
-    // Update device state optimistically
-    device.data.state = !device.data.state;
-    
-    // Log the action for analytics
-    homeAssistantClient.logDeviceAction(device.id, 'turnOnOff', device.data.state, true);
-    
-    // Log system event
-    homeAssistantClient.logSystemEvent('info', `Device ${device.name} ${device.data.state ? 'turned on' : 'turned off'}`);
-    
-    ElMessage.success(`Dispositivo ${device.name} ${device.data.state ? 'ligado' : 'desligado'}!`);
-    
-  } catch (err) {
-    // Log failed action
-    homeAssistantClient.logDeviceAction(device.id, 'turnOnOff', !device.data.state, false);
-    
-    // Log error
-    homeAssistantClient.logSystemEvent('error', `Failed to control device ${device.name}`, { error: err.message });
-    
-    ElMessage.error(`Erro ao controlar dispositivo: ${err.message}`);
-  }
-};
-
-// Enhanced scene trigger with rate limiting
-const triggerSceneWithRateLimit = async (scene) => {
-  try {
-    // Use rate-limited scene trigger
-    await homeAssistantClient.triggerSceneWithRateLimit(scene.id);
-    
-    // Log the action for analytics
-    homeAssistantClient.logDeviceAction(scene.id, 'triggerScene', true, true);
-    
-    // Log system event
-    homeAssistantClient.logSystemEvent('info', `Scene ${scene.name} triggered`);
-    
-    ElMessage.success(`Cena "${scene.name}" ativada!`);
-  } catch (err) {
-    // Log failed action
-    homeAssistantClient.logDeviceAction(scene.id, 'triggerScene', true, false);
-    
-    // Log error
-    homeAssistantClient.logSystemEvent('error', `Failed to trigger scene ${scene.name}`, { error: err.message });
-    
-    ElMessage.error(`Erro ao ativar cena: ${err.message}`);
-  }
 };
 </script>
 

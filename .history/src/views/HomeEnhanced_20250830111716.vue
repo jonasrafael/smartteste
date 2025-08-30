@@ -638,16 +638,6 @@ const loginForm = ref({ username: '', password: '' })
       // Restart monitoring if it was active before
       startTuyaMonitoring()
     }
-    
-    // Load last backup info
-    const savedLastBackup = localStorage.getItem('lastBackup')
-    if (savedLastBackup) {
-      try {
-        lastBackup.value = JSON.parse(savedLastBackup)
-      } catch (err) {
-        console.error('Error loading last backup info:', err)
-      }
-    }
   })
 
 // Watch for analytics period changes

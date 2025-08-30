@@ -566,38 +566,17 @@ const tuyaEventCounts = ref({
 // Device control queue status
 const deviceQueueStatus = ref(new Map())
 
-// Backup system state
-const showBackupDialog = ref(false)
-const showRestoreDialog = ref(false)
-const showBackupInfoDialog = ref(false)
-const isCreatingBackup = ref(false)
-const isDownloading = ref(false)
-const isRestoring = ref(false)
-const lastBackup = ref(null)
-const selectedBackupFile = ref(null)
-
-// Backup options
-const backupOptions = ref({
-  includeSensitive: false,
-  compress: true,
-  encrypt: false
-})
-
-// Restore options
+// Backup and restore state
+const showBackupDialog = ref(false);
+const isCreatingBackup = ref(false);
+const isDownloading = ref(false);
+const selectedBackupFile = ref(null);
 const restoreOptions = ref({
-  mode: 'merge',
-  backupBefore: true
-})
-
-// Backup summary
-const backupSummary = ref({
-  devices: 0,
-  scenes: 0,
-  rooms: 0,
-  records: 0,
-  logs: 0,
-  settings: 0
-})
+  backupBefore: true, // Default to backup before restore
+  mode: 'replace' // 'replace' or 'merge'
+});
+const backupSummary = ref(null);
+const lastBackup = ref(null);
 
 const devicesSorted = computed(() => {
   const order = { true: 0, undefined: 1, false: 2 }
@@ -637,16 +616,6 @@ const loginForm = ref({ username: '', password: '' })
     if (wasMonitoring) {
       // Restart monitoring if it was active before
       startTuyaMonitoring()
-    }
-    
-    // Load last backup info
-    const savedLastBackup = localStorage.getItem('lastBackup')
-    if (savedLastBackup) {
-      try {
-        lastBackup.value = JSON.parse(savedLastBackup)
-      } catch (err) {
-        console.error('Error loading last backup info:', err)
-      }
     }
   })
 
